@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
-from aiohttp import ClientSession, ClientError, ClientResponse
+from aiohttp import ClientError, ClientResponse, ClientSession
+
 from .exceptions import EnedisException, GatewayException, LimitReached
 
 URL = "https://myelectricaldata.fr"
@@ -15,17 +17,21 @@ _LOGGER = logging.getLogger(__name__)
 class EnedisAuth:
     """Class for Enedis Auth API."""
 
-    def __init__(self, token, session=None, timeout=TIMEOUT):
+    def __init__(
+        self, token: str, session: ClientSession = None, timeout: int = TIMEOUT
+    ) -> None:
         """Init."""
         self.token = token
         self.timeout = timeout
         self.session = session if session else ClientSession()
 
-    async def async_close(self):
+    async def async_close(self) -> None:
         """Close session."""
         await self.session.close()
 
-    async def request(self, path: str, method: str = "GET", **kwargs) -> ClientResponse:
+    async def request(
+        self, path: str, method: str = "GET", **kwargs: Any
+    ) -> ClientResponse:
         """Request session."""
         headers = kwargs.get("headers")
 

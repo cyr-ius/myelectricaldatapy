@@ -1,22 +1,26 @@
 # myelectricaldatapy
+
 Fetch date Enedis Linky from myelectricaldata.fr (enedisgateway.tech)
 
 Check your config, enable or disable heater, change preset mode.
 
-Install
--------
+## Install
+
 Use the PIP package manager
+
 ```bash
 $ pip install myelectricaldatapy
 ```
 
 Or manually download and install the last version from github
+
 ```bash
 $ git clone https://github.com/cyr-ius/myelectricaldatapy.git
 $ python setup.py install
 ```
-Get started
------------
+
+## Get started
+
 ```python
 # Import the myelectricaldatapy package.
 from myelectricaldatapy import EnedisGatewayClient
@@ -32,8 +36,9 @@ async def main():
 loop = asyncio.get_event_loop()
 loop.run_until_complete(main())
 ```
+
 Have a look at the [example.py](https://github.com/cyr-ius/myelectricaldatapy/blob/master/example.py) for a more complete overview.
 
-Notes on HTTPS
---------------
+## Notes on HTTPS
+
 Not implemented

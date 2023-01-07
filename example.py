@@ -1,19 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+""" Example code."""
 
 import asyncio
 import logging
-
 from datetime import datetime, timedelta
+
 from myelectricaldatapy import EnedisByPDL, EnedisException
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 # create console handler and set level to debug
 ch = logging.StreamHandler()
-formatter = logging.Formatter(
-    "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 ch.setFormatter(formatter)
 logger.addHandler(ch)
 
@@ -22,16 +21,15 @@ PDL = "0123456789"
 TOKEN = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 
 
-async def main():
+async def main() -> None:
+    """Main function."""
 
     api = EnedisByPDL(token=TOKEN)
 
     try:
-        start = (datetime.now() - timedelta(days=7))
+        start = datetime.now() - timedelta(days=7)
         end = datetime.now()
-        datas = await api.async_fetch_datas(
-            "consumption_load_curve", start, end, PDL
-        )
+        datas = await api.async_fetch_datas("consumption_load_curve", start, end, PDL)
         logger.info(datas)
         datas = await api.async_get_contract(PDL)
         logger.info(datas)

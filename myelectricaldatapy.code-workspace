@@ -1,7 +1,9 @@
 {
-  "folders": [{
-    "path": "."
-  }],
+  "folders": [
+    {
+      "path": "."
+    }
+  ],
   "settings": {
     "python.linting.flake8Enabled": true,
     "python.formatting.provider": "black",

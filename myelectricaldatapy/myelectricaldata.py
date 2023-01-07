@@ -1,14 +1,14 @@
 """Class for Enedis Gateway (http://www.myelectricaldata.fr)."""
 from __future__ import annotations
 
-import datetime
 import logging
 import re
 from datetime import datetime as dt
+from typing import Any
 
 from aiohttp import ClientResponse, ClientSession
 
-from .auth import EnedisAuth, TIMEOUT
+from .auth import TIMEOUT, EnedisAuth
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -50,27 +50,25 @@ class EnedisByPDL(EnedisGateway):
     ) -> None:
         """Initialize."""
         super().__init__(token, session, timeout)
-        self.offpeaks = []
+        self.offpeaks: list[str] = []
 
     async def async_fetch_datas(
-        self, service: str, start: datetime, end: datetime, pdl: str
+        self, service: str, start: dt, end: dt, pdl: str
     ) -> ClientResponse:
         """Get datas."""
-        start = start.strftime("%Y-%m-%d")
-        end = end.strftime("%Y-%m-%d")
-        path = f"{service}/{pdl}/start/{start}/end/{end}"
+        start_date = start.strftime("%Y-%m-%d")
+        end_date = end.strftime("%Y-%m-%d")
+        path = f"{service}/{pdl}/start/{start_date}/end/{end_date}"
         return await self.auth.request(path=path)
 
-    async def async_get_max_power(
-        self, start: datetime, end: datetime, pdl: str
-    ) -> ClientResponse:
+    async def async_get_max_power(self, start: dt, end: dt, pdl: str) -> ClientResponse:
         """Get consumption max power."""
-        start = start.strftime("%Y-%m-%d")
-        end = end.strftime("%Y-%m-%d")
-        path = f"daily_consumption_max_power/{pdl}/start/{start}/end/{end}"
+        start_date = start.strftime("%Y-%m-%d")
+        end_date = end.strftime("%Y-%m-%d")
+        path = f"daily_consumption_max_power/{pdl}/start/{start_date}/end/{end_date}"
         return await self.auth.request(path=path)
 
-    async def async_get_contract(self, pdl: str) -> dict(str, str):
+    async def async_get_contract(self, pdl: str) -> dict[str, Any]:
         """Return all."""
         contract = {}
         contracts = await self.async_get_contracts(pdl)
@@ -82,7 +80,7 @@ class EnedisByPDL(EnedisGateway):
                     self.offpeaks = re.findall("(?:(\\w+)-(\\w+))+", offpeak_hours)
         return contract
 
-    async def async_get_address(self, pdl: str) -> dict(str, str):
+    async def async_get_address(self, pdl: str) -> dict[str, Any]:
         """Return all."""
         address = {}
         addresses = await self.async_get_addresses(pdl)
@@ -98,13 +96,13 @@ class EnedisByPDL(EnedisGateway):
             await self.async_get_contract(pdl)
         return len(self.offpeaks) > 0
 
-    async def async_check_offpeak(self, start: datetime, pdl: str) -> bool:
+    async def async_check_offpeak(self, start: dt, pdl: str) -> bool:
         """Return offpeak status."""
         if await self.async_has_offpeak(pdl) is True:
             start_time = start.time()
             for range_time in self.offpeaks:
                 starting = dt.strptime(range_time[0], "%HH%M").time()
                 ending = dt.strptime(range_time[1], "%HH%M").time()
-                if start_time > starting and start_time <= ending:
+                if ending <= start_time > starting:
                     return True
         return False
