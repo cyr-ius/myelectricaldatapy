@@ -11,7 +11,9 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 # create console handler and set level to debug
 ch = logging.StreamHandler()
-formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+formatter = logging.Formatter(
+    "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 ch.setFormatter(formatter)
 logger.addHandler(ch)
 
@@ -27,7 +29,9 @@ async def main():
     try:
         start = (datetime.now() - timedelta(days=7))
         end = datetime.now()
-        datas = await api.async_fetch_datas("consumption_load_curve", start, end, PDL)
+        datas = await api.async_fetch_datas(
+            "consumption_load_curve", start, end, PDL
+        )
         logger.info(datas)
         datas = await api.async_get_contract(PDL)
         logger.info(datas)

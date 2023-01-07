@@ -47,7 +47,7 @@ class EnedisByPDL(EnedisGateway):
 
     def __init__(
         self, token: str, session: ClientSession = None, timeout: int = TIMEOUT
-    ):
+    ) -> None:
         """Initialize."""
         super().__init__(token, session, timeout)
         self.offpeaks = []

@@ -3,17 +3,12 @@
     "path": "."
   }],
   "settings": {
-    "python.linting.flake8Args": ["--ignore=E501,W504,E712,W503"],
-    "python.linting.pycodestyleArgs": [
-      "--ignore=E501,W503"
-    ],
-    "cSpell.words": [
-      "aiohttp",
-      "enedis",
-      "Enedis",
-      "offpeak",
-      "offpeaks"
-    ]
+    "python.linting.flake8Enabled": true,
+    "python.formatting.provider": "black",
+    "editor.formatOnSave": true,
+    "python.linting.pycodestyleEnabled": true,
+    "python.linting.pydocstyleEnabled": false,
+    "python.linting.pylintEnabled": true
   },
   "launch": {
     "version": "0.2.0",
@@ -25,7 +20,6 @@
         "program": "example.py",
         "console": "integratedTerminal"
       }
-    ]
     ]
   }
 }
