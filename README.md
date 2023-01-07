@@ -32,7 +32,7 @@ async def main():
 loop = asyncio.get_event_loop()
 loop.run_until_complete(main())
 ```
-Have a look at the [example.py](https://github.com/cyr-ius/heatzypy/blob/master/example.py) for a more complete overview.
+Have a look at the [example.py](https://github.com/cyr-ius/myelectricaldatapy/blob/master/example.py) for a more complete overview.
 
 Notes on HTTPS
 --------------
