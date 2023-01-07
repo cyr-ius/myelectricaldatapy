@@ -1,0 +1,31 @@
+{
+  "folders": [{
+    "path": "."
+  }],
+  "settings": {
+    "python.linting.flake8Args": ["--ignore=E501,W504,E712,W503"],
+    "python.linting.pycodestyleArgs": [
+      "--ignore=E501,W503"
+    ],
+    "cSpell.words": [
+      "aiohttp",
+      "enedis",
+      "Enedis",
+      "offpeak",
+      "offpeaks"
+    ]
+  },
+  "launch": {
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "Python : Fichier Exemple",
+        "type": "python",
+        "request": "launch",
+        "program": "example.py",
+        "console": "integratedTerminal"
+      }
+    ]
+    ]
+  }
+}

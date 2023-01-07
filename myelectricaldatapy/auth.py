@@ -1,0 +1,56 @@
+"""Class for Enedis Authentification (http://www.myelectricaldata.fr)."""
+from __future__ import annotations
+
+import logging
+
+from aiohttp import ClientSession, ClientError, ClientResponse
+from .exceptions import EnedisException, GatewayException, LimitReached
+
+URL = "https://myelectricaldata.fr"
+TIMEOUT = 30
+
+_LOGGER = logging.getLogger(__name__)
+
+
+class EnedisAuth:
+    """Class for Enedis Auth API."""
+
+    def __init__(self, token, session=None, timeout=TIMEOUT):
+        """Init."""
+        self.token = token
+        self.timeout = timeout
+        self.session = session if session else ClientSession()
+
+    async def async_close(self):
+        """Close session."""
+        await self.session.close()
+
+    async def request(self, path: str, method: str = "GET", **kwargs) -> ClientResponse:
+        """Request session."""
+        headers = kwargs.get("headers")
+
+        if headers is None:
+            headers = {}
+        else:
+            headers = dict(headers)
+
+        headers["Content-Type"] = "application/json"
+        headers["Authorization"] = self.token
+
+        try:
+            _LOGGER.debug("Request %s/%s (%s)", URL, path, kwargs)
+            resp = await self.session.request(
+                method, f"{URL}/{path}", **kwargs, headers=headers, timeout=self.timeout
+            )
+            response = await resp.json()
+            _LOGGER.debug("Response %s", response)
+
+            if "tag" in response and response["tag"] in ["limit_reached"]:
+                raise LimitReached(response.get("description"))
+
+            if "alert_user" in response:
+                raise GatewayException(response.get("description"))
+
+            return response
+        except ClientError as error:
+            raise EnedisException from error
