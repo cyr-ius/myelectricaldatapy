@@ -1,5 +1,5 @@
 # myelectricaldatapy
-Fetch date Enedis Linky from myelectricaldata.fr (enedisgateway.tch)
+Fetch date Enedis Linky from myelectricaldata.fr (enedisgateway.tech)
 
 Check your config, enable or disable heater, change preset mode.
 
@@ -7,7 +7,7 @@ Install
 -------
 Use the PIP package manager
 ```bash
-$ pip install enedisgatewaypy
+$ pip install myelectricaldatapy
 ```
 
 Or manually download and install the last version from github
