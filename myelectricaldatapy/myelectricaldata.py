@@ -53,12 +53,15 @@ class EnedisByPDL(EnedisGateway):
         self.offpeaks: list[str] = []
 
     async def async_fetch_datas(
-        self, service: str, start: dt, end: dt, pdl: str
+        self, service: str, pdl: str, start: dt | None = None, end: dt | None = None
     ) -> ClientResponse:
         """Get datas."""
-        start_date = start.strftime("%Y-%m-%d")
-        end_date = end.strftime("%Y-%m-%d")
-        path = f"{service}/{pdl}/start/{start_date}/end/{end_date}"
+        path_range = ""
+        if start and end:
+            start_date = start.strftime("%Y-%m-%d")
+            end_date = end.strftime("%Y-%m-%d")
+            path_range = f"/start/{start_date}/end/{end_date}"
+        path = f"{service}/{pdl}{path_range}"
         return await self.auth.request(path=path)
 
     async def async_get_max_power(self, start: dt, end: dt, pdl: str) -> ClientResponse:

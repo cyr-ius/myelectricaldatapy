@@ -29,7 +29,7 @@ async def main() -> None:
     try:
         start = datetime.now() - timedelta(days=7)
         end = datetime.now()
-        datas = await api.async_fetch_datas("consumption_load_curve", start, end, PDL)
+        datas = await api.async_fetch_datas("consumption_load_curve", PDL, start, end)
         logger.info(datas)
         datas = await api.async_get_contract(PDL)
         logger.info(datas)
