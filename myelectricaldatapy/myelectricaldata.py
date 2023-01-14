@@ -37,20 +37,24 @@ class EnedisAnalytics:
     def group_data(
         self, jsdata: dict[str, Any], field: str = "date", freq: str = "H"
     ) -> Any:
+        """Group by date."""
         df = self._todataframe(jsdata)
         df.resample(freq, on=field).value.sum()
         return self._tostring(df)
 
     def set_price(self, jsdata: dict[str, Any], price: float) -> Any:
+        """Set prince."""
         df = self._todataframe(jsdata)
         df["price"] = df["value"] * price
         return self._tostring(df)
 
     def _tostring(self, df: pd.DataFrame) -> Any:
+        """Return dict with string date."""
         df["date"] = df["date"].dt.strftime("%Y-%m-%d %H:%M:%S")
         return df.to_dict()
 
     def _todataframe(self, jsdata: dict[str, Any]) -> pd.DataFrame:
+        """Convert dict to dataframe."""
         df = pd.DataFrame(jsdata)
         df["date"] = pd.to_datetime(df["date"], format="%Y-%m-%d %H:%M:%S")
         df["value"] = pd.to_numeric(df["value"])
