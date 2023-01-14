@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from aiohttp import ClientError, ClientResponse, ClientSession
+from aiohttp import ClientError, ClientSession
 
 from .exceptions import EnedisException, GatewayException, LimitReached
 
@@ -29,15 +29,10 @@ class EnedisAuth:
         """Close session."""
         await self.session.close()
 
-    async def request(
-        self, path: str, method: str = "GET", **kwargs: Any
-    ) -> ClientResponse:
+    async def request(self, path: str, method: str = "GET", **kwargs: Any) -> Any:
         """Request session."""
-        headers = kwargs.get("headers")
-
-        if headers is None:
-            headers = {}
-        else:
+        response = {}
+        if headers := kwargs.get("headers", {}):
             headers = dict(headers)
 
         headers["Content-Type"] = "application/json"
@@ -50,13 +45,11 @@ class EnedisAuth:
             )
             response = await resp.json()
             _LOGGER.debug("Response %s", response)
-
-            if "tag" in response and response["tag"] in ["limit_reached"]:
-                raise LimitReached(response.get("description"))
-
-            if "alert_user" in response:
-                raise GatewayException(response.get("description"))
-
-            return response
+            if resp.status == 409:
+                raise LimitReached(response.get("detail"))
+            if resp.status == 422:
+                raise GatewayException(response.get("detail"))
         except ClientError as error:
             raise EnedisException from error
+        else:
+            return response
