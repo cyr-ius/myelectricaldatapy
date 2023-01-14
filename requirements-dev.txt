@@ -5,3 +5,6 @@ black
 pylint
 pre-commit
 mypy
+pytest-asyncio
+pyannotate
+pytest
