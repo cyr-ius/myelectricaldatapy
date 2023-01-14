@@ -1,4 +1,5 @@
 from datetime import datetime as dt
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -23,7 +24,7 @@ VALID = {
     "ban": False,
 }
 
-CONTRACT = {}
+CONTRACT: dict[str, Any] = {}
 TEMPO = "RED"
 
 
