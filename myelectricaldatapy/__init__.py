@@ -2,11 +2,11 @@
 
 """myelectricaldatapy package."""
 from .exceptions import EnedisException, GatewayException, LimitReached
-from .myelectricaldata import EnedisByPDL, EnedisGateway
+from .myelectricaldata import EnedisAnalytics, EnedisByPDL
 
 __all__ = [
-    "EnedisGateway",
     "EnedisByPDL",
+    "EnedisAnalytics",
     "EnedisException",
     "LimitReached",
     "GatewayException",
