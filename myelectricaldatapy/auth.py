@@ -18,7 +18,7 @@ class EnedisAuth:
     """Class for Enedis Auth API."""
 
     def __init__(
-        self, token: str, session: ClientSession = None, timeout: int = TIMEOUT
+        self, token: str, session: ClientSession | None = None, timeout: int = TIMEOUT
     ) -> None:
         """Init."""
         self.token = token
