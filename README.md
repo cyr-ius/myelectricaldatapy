@@ -33,7 +33,7 @@ async def main():
     
     start = datetime.now() - timedelta(days=7)
     end = datetime.now()
-    datas = await async_get_details_consumption(start,end)
+    datas = await api.async_get_details_consumption(start,end)
     print(datas)
     
     analytics = EnedisAnalytics(datas)
