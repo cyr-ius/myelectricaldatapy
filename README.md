@@ -23,6 +23,9 @@ $ python setup.py install
 # Import the myelectricaldatapy package.
 from myelectricaldatapy import EnedisByPDL,EnedisAnalytics
 
+TOKEN="012345"
+PDL="012345012345"
+
 async def main():
     api = EnedisByPDL(token=TOKEN, pdl=PDL)
     print(await api.async_get_contract())
