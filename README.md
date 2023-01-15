@@ -17,6 +17,27 @@ $ git clone https://github.com/cyr-ius/myelectricaldatapy.git
 $ python setup.py install
 ```
 
+## Attributs
+ - tempo_day : RED/WHITE/BLUE
+ - ecowatt : Information Dictionary 
+ - power_datas: Datas 
+
+## Methods
+- async_get_max_power
+- async_get_details_production
+- async_get_details_consumption
+- async_get_daily_production
+- async_get_daily_consumption
+- async_get_identity
+- async_check_offpeak
+- async_has_offpeak
+- async_get_ecowatt
+- async_get_tempoday
+- async_get_address
+- async_get_contract
+- async_valid_access
+- async_fetch_datas
+
 ## Get started
 
 ```python
@@ -70,7 +91,3 @@ loop.run_until_complete(main())
 ```
 
 Have a look at the [example.py](https://github.com/cyr-ius/myelectricaldatapy/blob/master/example.py) for a more complete overview.
-
-## Notes on HTTPS
-
-Not implemented
