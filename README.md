@@ -2,8 +2,6 @@
 
 Fetch date Enedis Linky from myelectricaldata.fr (enedisgateway.tech)
 
-Check your config, enable or disable heater, change preset mode.
-
 ## Install
 
 Use the PIP package manager
@@ -23,16 +21,37 @@ $ python setup.py install
 
 ```python
 # Import the myelectricaldatapy package.
-from myelectricaldatapy import EnedisGatewayClient
+from myelectricaldatapy import EnedisByPDL,EnedisAnalytics
 
 async def main():
-    api = EnedisGatewayClient("pdl", "token")
-    devices = await api.async_get_devices()
-    for device in devices:
-        name = device.get("dev_alias")
-        data = await api.async_get_device(device["did"])
-        mode = data.get("attr").get("mode")
-        logger.info("Heater : {} , mode : {}".format(name, mode))
+    api = EnedisByPDL(token=TOKEN, pdl=PDL)
+    print(await api.async_get_contract())
+    print(await api.async_get_address())
+    
+    start = datetime.now() - timedelta(days=7)
+    end = datetime.now()
+    datas = await async_get_details_consumption(start,end)
+    print(datas)
+    
+    analytics = EnedisAnalytics(datas)
+    offpeak_intervals = [(dt.strptime("08H00", "%HH%M"), dt.strptime("12H00", "%HH%M"))]
+    
+    
+    resultat = analytics.get_data_analytcis(
+        convertKwh=True,
+        convertUTC=True,
+        intervals=offpeak_intervals,
+        groupby="date",
+        summary=True,
+    )
+      
+    offpeak = analytics.set_price(resultat[0], 0.1641, True)
+    normal = analytics.set_price(resultat[1], 0.18, True)
+    
+    print(offpeak)
+    print(normal)
+    
+    
 loop = asyncio.get_event_loop()
 loop.run_until_complete(main())
 ```
