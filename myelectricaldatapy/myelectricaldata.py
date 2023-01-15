@@ -158,7 +158,7 @@ class EnedisByPDL:
         return await self.async_fetch_datas("valid_access")
 
     async def async_get_contract(self) -> Any:
-        """Return all."""
+        """Return contract information."""
         contract = {}
         contracts = await self.async_fetch_datas("contracts")
         usage_points = contracts.get("customer", {}).get("usage_points", "")
@@ -176,8 +176,12 @@ class EnedisByPDL:
                     ]
         return contract
 
+    async def async_get_contracts(self) -> Any:
+        """Return all contracts information."""
+        return await self.async_fetch_datas("contracts")
+
     async def async_get_address(self) -> Any:
-        """Return all."""
+        """Return adress information."""
         address = {}
         addresses = await self.async_fetch_datas("addresses")
         usage_points = addresses.get("customer", {}).get("usage_points", "")
@@ -185,6 +189,10 @@ class EnedisByPDL:
             if usage_point.get("usage_point", {}).get("usage_point_id") == self.pdl:
                 address = usage_point.get("usage_point")
         return address
+
+    async def async_get_addresses(self) -> Any:
+        """Return all adresses information."""
+        return await self.async_fetch_datas("adresses")
 
     async def async_get_tempoday(self) -> Any:
         """Return Tempo Day."""
@@ -217,13 +225,13 @@ class EnedisByPDL:
         """Get identity."""
         return await self.async_fetch_datas("identity")
 
-    async def async_get_daily_consumption(self, day: dt) -> Any:
+    async def async_get_daily_consumption(self, start: dt, end: dt) -> Any:
         """Get daily consumption."""
-        return await self.async_fetch_datas("daily_consumption", day, day)
+        return await self.async_fetch_datas("daily_consumption", start, end)
 
-    async def async_get_daily_production(self, day: dt) -> Any:
+    async def async_get_daily_production(self, start: dt, end: dt) -> Any:
         """Get daily production."""
-        return await self.async_fetch_datas("daily_production", day, day)
+        return await self.async_fetch_datas("daily_production", start, end)
 
     async def async_get_details_consumption(self, start: dt, end: dt) -> Any:
         """Get consumption details. (max: 7 days)."""
