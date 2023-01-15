@@ -122,6 +122,14 @@ class EnedisAnalytics:
             df["sum_price"] = df["price"].cumsum()
         return df.to_dict("records")
 
+    def get_last_value(self, data: dict[str, Any], orderby: str, value: str) -> Any:
+        """Return last value after order by."""
+        df = pd.DataFrame(data)
+        if df.empty:
+            return df.to_dict(orient="records")
+        df = df.sort_values(by=orderby)
+        return df[value].iloc[-1]
+
 
 class EnedisByPDL:
     """Get data of pdl."""

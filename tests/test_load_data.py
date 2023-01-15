@@ -86,7 +86,9 @@ async def test_analytcis() -> None:
         summary=True,
     )
     offpeak = analytics.set_price(resultat, 0.1641, True)
-    print(offpeak)
+    assert offpeak[0]["value"] == 3.146
+    value = analytics.get_last_value(resultat, "date", "sum_value")
+    assert value == 51.765
 
 
 @pytest.mark.asyncio
@@ -102,7 +104,7 @@ async def test_empty() -> None:
         summary=True,
     )
     offpeak = analytics.set_price(resultat, 0.1641, True)
-    print(offpeak)
+    assert offpeak == []
 
 
 @pytest.mark.asyncio
@@ -110,4 +112,4 @@ async def test_nodata() -> None:
     analytics = EnedisAnalytics([])
     resultat = analytics.get_data_analytcis()
     offpeak = analytics.set_price(resultat, 0.1641, True)
-    print(offpeak)
+    assert offpeak == []
