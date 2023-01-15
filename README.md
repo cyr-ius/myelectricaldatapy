@@ -28,6 +28,7 @@ PDL="012345012345"
 
 async def main():
     api = EnedisByPDL(token=TOKEN, pdl=PDL)
+    
     print(await api.async_get_contract())
     print(await api.async_get_address())
     
@@ -38,8 +39,14 @@ async def main():
     
     analytics = EnedisAnalytics(datas)
     offpeak_intervals = [(dt.strptime("08H00", "%HH%M"), dt.strptime("12H00", "%HH%M"))]
+        
+    # it is possible to load detailed production and consumption data within the object (in the power_datas attribute)
+    await api.async_load()
+    print(api.power_datas)
+    # and refresh datas load.
+    await api.async_refresh()
     
-    
+    # Analytics data convert
     resultat = analytics.get_data_analytcis(
         convertKwh=True,
         convertUTC=True,
@@ -54,6 +61,9 @@ async def main():
     print(offpeak)
     print(normal)
     
+    
+    
+    await api.async_close()
     
 loop = asyncio.get_event_loop()
 loop.run_until_complete(main())
