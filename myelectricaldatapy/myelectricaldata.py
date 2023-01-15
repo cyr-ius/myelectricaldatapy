@@ -33,9 +33,12 @@ class EnedisAnalytics:
     ) -> Any:
         """Convert datas to analyze."""
         if convertKwh:
-            interval = self.df["interval_length"][0]
-            interval = self._weighted_interval(interval)
-            self.df["value"] = pd.to_numeric(self.df["value"]) / 1000 * interval
+            self.df["interval_length"] = self.df["interval_length"].transform(
+                self._weighted_interval
+            )
+            self.df["value"] = (
+                pd.to_numeric(self.df["value"]) / 1000 * self.df["interval_length"]
+            )
         if convertUTC:
             self.df["date"] = pd.to_datetime(
                 self.df["date"], utc=True, format="%Y-%m-%d %H:%M:%S"
