@@ -29,8 +29,11 @@ class EnedisAnalytics:
         groupby: str | None = None,
         freq: str = "H",
         summary: bool = False,
+        cumsum: float = 0,
     ) -> Any:
         """Convert datas to analyze."""
+        if self.df.empty:
+            return self.df.to_dict(orient="records")
         if convertKwh:
             self.df["interval_length"] = self.df["interval_length"].transform(
                 self._weighted_interval
@@ -44,7 +47,9 @@ class EnedisAnalytics:
             )
 
         if intervals:
-            resultat = self._get_data_interval(intervals, groupby, freq, summary)
+            resultat = self._get_data_interval(
+                intervals, groupby, freq, summary, cumsum
+            )
             return resultat[0].to_dict("records"), resultat[1].to_dict("records")
         else:
             return self.df.to_dict(orient="records")
@@ -61,7 +66,8 @@ class EnedisAnalytics:
         groupby: str | None = None,
         freq: str = "H",
         summary: bool = False,
-    ) -> Tuple[Any, Any]:
+        cumsum: float = 0,
+    ) -> pd.DataFrame:
         """Group date from range time.
 
         Returns a tuple
@@ -76,7 +82,7 @@ class EnedisAnalytics:
             ]
             in_df = pd.concat([in_df, df2], ignore_index=True)
 
-        out_df = self.df[~self.df.isin(in_df)].dropna()
+        # out_df = self.df[~self.df.isin(in_df)].dropna()
 
         if groupby:
             in_df = (
@@ -86,23 +92,29 @@ class EnedisAnalytics:
             )
             in_df = in_df[in_df.value != 0]
 
-            out_df = (
-                out_df.groupby(pd.Grouper(key="date", freq="H"))["value"]
-                .sum()
-                .reset_index()
-            )
+            # out_df = (
+            #     out_df.groupby(pd.Grouper(key="date", freq="H"))["value"]
+            #     .sum()
+            #     .reset_index()
+            # )
 
         if summary:
-            in_df["sum_value"] = in_df.value.cumsum()
-            out_df["sum_value"] = out_df.value.cumsum()
+            in_df["sum_value"] = in_df.value.cumsum() + cumsum
+            # out_df["sum_value"] = out_df.value.cumsum() + cumsum
 
-        return in_df, out_df
+        # return in_df, out_df
+        return in_df
 
     def set_price(
-        self, data: dict[str, Any], price: float, summary: bool = False
+        self,
+        data: dict[str, Any],
+        price: float,
+        summary: bool = False,
     ) -> Any:
         """Set prince."""
         df = pd.DataFrame(data)
+        if df.empty:
+            return df.to_dict(orient="records")
         df["price"] = df["value"] * price
         if summary:
             df["sum_price"] = df["price"].cumsum()
