@@ -5,7 +5,6 @@ import logging
 import re
 from datetime import date
 from datetime import datetime as dt
-from datetime import timedelta
 from typing import Any, Optional, Tuple
 
 import pandas as pd
@@ -137,6 +136,7 @@ class EnedisByPDL:
         self.tempo_day: str | None = None
         self.ecowatt: dict[str, Any] = {}
         self.valid_access: dict[str, Any] = {}
+        self.models: list[Tuple[str, dt, dt]] = []
 
     async def async_fetch_datas(
         self, service: str, start: dt | None = None, end: dt | None = None
@@ -252,50 +252,26 @@ class EnedisByPDL:
         """Close session."""
         await self.auth.async_close()
 
-    async def async_load(
-        self,
-        start: dt = dt.now() - timedelta(days=7),
-        end: dt = dt.now(),
-        daily: bool = False,
-    ) -> None:
-        """Retrieves production and consumption data."""
-        self.valid_access = await self.async_valid_access()
-        if daily:
-            c_datas = await self.async_get_daily_consumption(start, end)
-            self.power_datas.update(
-                {
-                    "daily_consumption": c_datas.get("meter_reading", {}).get(
-                        "interval_reading"
-                    )
-                }
-            )
-            if self.b_production:
-                p_datas = await self.async_get_daily_production(start, end)
-                self.power_datas.update(
-                    {
-                        "daily_production": p_datas.get("meter_reading", {}).get(
-                            "interval_reading"
-                        )
-                    }
-                )
+    async def async_load(self, models: list[Tuple[str, dt, dt]] | None = None) -> None:
+        """Retrieves production and consumption data.
+
+        models , list contain tuple
+        tuple : service (string) , start (datetime) , end (datetime)
+        """
+        if models is None:
+            models = self.models
         else:
-            c_datas = await self.async_get_details_consumption(start, end)
+            self.models = models
+        self.valid_access = await self.async_valid_access()
+        self.power_datas = {}
+        for model in models:
+            service = model[0]
+            start = model[1]
+            end = model[2]
+            datas = await self.async_fetch_datas(service, start, end)
             self.power_datas.update(
-                {
-                    "consumption_load_curve": c_datas.get("meter_reading", {}).get(
-                        "interval_reading"
-                    )
-                }
+                {service: datas.get("meter_reading", {}).get("interval_reading")}
             )
-            if self.b_production:
-                p_datas = await self.async_get_details_production(start, end)
-                self.power_datas.update(
-                    {
-                        "production_load_curve": p_datas.get("meter_reading", {}).get(
-                            "interval_reading"
-                        )
-                    }
-                )
 
         if self.last_refresh_date is None or dt.now().date() > self.last_refresh_date:
             await self.async_get_contract()
