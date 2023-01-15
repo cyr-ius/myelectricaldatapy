@@ -18,47 +18,93 @@ _LOGGER = logging.getLogger(__name__)
 class EnedisAnalytics:
     """Data analaytics."""
 
-    def get_data_interval(
-        self, jsdata: dict[str, Any], intervalls: list[Tuple[dt, dt]]
+    def __init__(self, data: dict[str, Any]) -> None:
+        """Initialize Dataframe."""
+        self.df = pd.DataFrame(data)
+
+    def get_data_analytcis(
+        self,
+        convertKwh: bool = False,
+        convertUTC: bool = False,
+        intervals: list[Tuple[dt, dt]] | None = None,
+        groupby: str | None = None,
+        freq: str = "H",
+        summary: bool = False,
+    ) -> Any:
+        """Convert datas to analyze."""
+        if convertKwh:
+            interval = self.df["interval_length"][0]
+            interval = self._weighted_interval(interval)
+            self.df["value"] = pd.to_numeric(self.df["value"]) / 1000 * interval
+        if convertUTC:
+            self.df["date"] = pd.to_datetime(
+                self.df["date"], utc=True, format="%Y-%m-%d %H:%M:%S"
+            )
+
+        if intervals:
+            resultat = self._get_data_interval(intervals, groupby, freq, summary)
+            return resultat[0].to_dict("records"), resultat[1].to_dict("records")
+        else:
+            return self.df.to_dict(orient="records")
+
+    def _weighted_interval(self, interval: str) -> float | int:
+        """Compute weighted."""
+        if interval and len(rslt := re.findall("PT([0-9]{2})M", interval)) == 1:
+            return int(rslt[0]) / 60
+        return 1
+
+    def _get_data_interval(
+        self,
+        intervalls: list[Tuple[dt, dt]],
+        groupby: str | None = None,
+        freq: str = "H",
+        summary: bool = False,
     ) -> Tuple[Any, Any]:
-        """Group date from range time."""
-        df = self._todataframe(jsdata)
+        """Group date from range time.
+
+        Returns a tuple
+        First dict contains the data in the interval
+        and the second dict contains the data outside
+        """
         in_df = pd.DataFrame()
         for intervall in intervalls:
-            df2 = df[
-                (df.date.dt.time >= intervall[0].time())
-                & (df.date.dt.time < intervall[1].time())
+            df2 = self.df[
+                (self.df.date.dt.time >= intervall[0].time())
+                & (self.df.date.dt.time < intervall[1].time())
             ]
             in_df = pd.concat([in_df, df2], ignore_index=True)
 
-        out_df = df[df.apply(tuple, 1).isin(in_df.apply(tuple, 1))]
-        return self._tostring(in_df), self._tostring(out_df)
+        out_df = self.df[~self.df.isin(in_df)].dropna()
 
-    def group_data(
-        self, jsdata: dict[str, Any], field: str = "date", freq: str = "H"
+        if groupby:
+            in_df = (
+                in_df.groupby(pd.Grouper(key="date", freq="H"))["value"]
+                .sum()
+                .reset_index()
+            )
+            in_df = in_df[in_df.value != 0]
+
+            out_df = (
+                out_df.groupby(pd.Grouper(key="date", freq="H"))["value"]
+                .sum()
+                .reset_index()
+            )
+
+        if summary:
+            in_df["sum_value"] = in_df.value.cumsum()
+            out_df["sum_value"] = out_df.value.cumsum()
+
+        return in_df, out_df
+
+    def set_price(
+        self, data: dict[str, Any], price: float, summary: bool = False
     ) -> Any:
-        """Group by date."""
-        df = self._todataframe(jsdata)
-        df.resample(freq, on=field).value.sum()
-        return self._tostring(df)
-
-    def set_price(self, jsdata: dict[str, Any], price: float) -> Any:
         """Set prince."""
-        df = self._todataframe(jsdata)
+        df = pd.DataFrame(data)
         df["price"] = df["value"] * price
-        return self._tostring(df)
-
-    def _tostring(self, df: pd.DataFrame) -> Any:
-        """Return dict with string date."""
-        df["date"] = df["date"].dt.strftime("%Y-%m-%d %H:%M:%S")
-        return df.to_dict()
-
-    def _todataframe(self, jsdata: dict[str, Any]) -> pd.DataFrame:
-        """Convert dict to dataframe."""
-        df = pd.DataFrame(jsdata)
-        df["date"] = pd.to_datetime(df["date"], format="%Y-%m-%d %H:%M:%S")
-        df["value"] = pd.to_numeric(df["value"])
-        return df
+        if summary:
+            df["sum_price"] = df["price"].cumsum()
+        return df.to_dict("records")
 
 
 class EnedisByPDL:

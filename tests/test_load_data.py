@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 
 import myelectricaldatapy
-from myelectricaldatapy import EnedisByPDL
+from myelectricaldatapy import EnedisAnalytics, EnedisByPDL
 
 from .consts import DATASET
 
@@ -60,3 +60,21 @@ async def test_load() -> None:
         )
         await api.async_refresh()
         await api.async_close()
+
+
+@pytest.mark.asyncio
+async def test_analytcis() -> None:
+    intervals = [(dt.strptime("08H00", "%HH%M"), dt.strptime("12H00", "%HH%M"))]
+    dataset = DATASET["meter_reading"]["interval_reading"]
+    analytics = EnedisAnalytics(dataset)
+    resultat = analytics.get_data_analytcis(
+        convertKwh=True,
+        convertUTC=True,
+        intervals=intervals,
+        groupby="date",
+        summary=True,
+    )
+    offpeak = analytics.set_price(resultat[0], 0.1641, True)
+    normal = analytics.set_price(resultat[1], 0.18, True)
+    print(offpeak)
+    print(normal)
