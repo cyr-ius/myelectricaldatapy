@@ -40,9 +40,24 @@ async def test_load() -> None:
         myelectricaldatapy.auth.EnedisAuth, "request", return_value={}
     ), patch.object(
         EnedisByPDL, "async_get_tempoday", return_value=TEMPO
+    ), patch.object(
+        EnedisByPDL, "async_fetch_datas", return_value=DATASET
     ):
         api = EnedisByPDL(token=TOKEN, pdl=PDL)
-        await api.async_load()
+        await api.async_load(
+            [
+                (
+                    "comsumption_load_curve",
+                    dt.strptime("2022-12-30", "%Y-%m-%d"),
+                    dt.strptime("2022-12-31", "%Y-%m-%d"),
+                )
+            ]
+        )
+        assert (
+            api.power_datas["comsumption_load_curve"]
+            == DATASET["meter_reading"]["interval_reading"]
+        )
+
         await api.async_get_max_power(dt.now(), dt.now())
         await api.async_get_contract()
         await api.async_get_tempoday()
@@ -51,13 +66,9 @@ async def test_load() -> None:
         await api.async_has_offpeak()
         await api.async_check_offpeak(dt.now())
         await api.async_get_identity()
-        await api.async_get_daily_consumption(dt.now())
-        await api.async_get_daily_production(dt.now())
+        await api.async_get_daily_consumption(dt.now(), dt.now())
+        await api.async_get_daily_production(dt.now(), dt.now())
         await api.async_get_details_production(dt.now(), dt.now())
-        assert (
-            api.power_datas["consumption"]
-            == DATASET["meter_reading"]["interval_reading"]
-        )
         await api.async_refresh()
         await api.async_close()
 
@@ -74,7 +85,29 @@ async def test_analytcis() -> None:
         groupby="date",
         summary=True,
     )
-    offpeak = analytics.set_price(resultat[0], 0.1641, True)
-    normal = analytics.set_price(resultat[1], 0.18, True)
+    offpeak = analytics.set_price(resultat, 0.1641, True)
     print(offpeak)
-    print(normal)
+
+
+@pytest.mark.asyncio
+async def test_empty() -> None:
+    intervals = [(dt.strptime("08H00", "%HH%M"), dt.strptime("12H00", "%HH%M"))]
+    analytics = EnedisAnalytics([])
+    resultat = analytics.get_data_analytcis(
+        convertKwh=True,
+        convertUTC=True,
+        start_date="2000-01-01",
+        intervals=intervals,
+        groupby="date",
+        summary=True,
+    )
+    offpeak = analytics.set_price(resultat, 0.1641, True)
+    print(offpeak)
+
+
+@pytest.mark.asyncio
+async def test_nodata() -> None:
+    analytics = EnedisAnalytics([])
+    resultat = analytics.get_data_analytcis()
+    offpeak = analytics.set_price(resultat, 0.1641, True)
+    print(offpeak)

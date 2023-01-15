@@ -25,6 +25,7 @@ class EnedisAnalytics:
         self,
         convertKwh: bool = False,
         convertUTC: bool = False,
+        start_date: str | None = None,
         intervals: list[Tuple[dt, dt]] | None = None,
         groupby: str | None = None,
         freq: str = "H",
@@ -32,8 +33,12 @@ class EnedisAnalytics:
         cumsum: float = 0,
     ) -> Any:
         """Convert datas to analyze."""
+        if start_date and not self.df.empty:
+            self.df = self.df[(self.df["date"] > start_date)]
+
         if self.df.empty:
             return self.df.to_dict(orient="records")
+
         if convertKwh:
             self.df["interval_length"] = self.df["interval_length"].transform(
                 self._weighted_interval
@@ -47,12 +52,9 @@ class EnedisAnalytics:
             )
 
         if intervals:
-            resultat = self._get_data_interval(
-                intervals, groupby, freq, summary, cumsum
-            )
-            return resultat[0].to_dict("records"), resultat[1].to_dict("records")
-        else:
-            return self.df.to_dict(orient="records")
+            self.df = self._get_data_interval(intervals, groupby, freq, summary, cumsum)
+
+        return self.df.to_dict(orient="records")
 
     def _weighted_interval(self, interval: str) -> float | int:
         """Compute weighted."""
