@@ -256,18 +256,46 @@ class EnedisByPDL:
         self,
         start: dt = dt.now() - timedelta(days=7),
         end: dt = dt.now(),
+        daily: bool = False,
     ) -> None:
-        """Retrieves production and consumption data over 7 days"""
+        """Retrieves production and consumption data."""
         self.valid_access = await self.async_valid_access()
-        c_datas = await self.async_get_details_consumption(start, end)
-        self.power_datas.update(
-            {"consumption": c_datas.get("meter_reading", {}).get("interval_reading")}
-        )
-        if self.b_production:
-            p_datas = await self.async_get_details_production(start, end)
+        if daily:
+            c_datas = await self.async_get_daily_consumption(start, end)
             self.power_datas.update(
-                {"production": p_datas.get("meter_reading", {}).get("interval_reading")}
+                {
+                    "daily_consumption": c_datas.get("meter_reading", {}).get(
+                        "interval_reading"
+                    )
+                }
             )
+            if self.b_production:
+                p_datas = await self.async_get_daily_production(start, end)
+                self.power_datas.update(
+                    {
+                        "daily_production": p_datas.get("meter_reading", {}).get(
+                            "interval_reading"
+                        )
+                    }
+                )
+        else:
+            c_datas = await self.async_get_details_consumption(start, end)
+            self.power_datas.update(
+                {
+                    "consumption_load_curve": c_datas.get("meter_reading", {}).get(
+                        "interval_reading"
+                    )
+                }
+            )
+            if self.b_production:
+                p_datas = await self.async_get_details_production(start, end)
+                self.power_datas.update(
+                    {
+                        "production_load_curve": p_datas.get("meter_reading", {}).get(
+                            "interval_reading"
+                        )
+                    }
+                )
 
         if self.last_refresh_date is None or dt.now().date() > self.last_refresh_date:
             await self.async_get_contract()
