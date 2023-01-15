@@ -23,20 +23,21 @@ $ python setup.py install
  - power_datas: Datas 
 
 ## Methods
-- async_get_max_power
-- async_get_details_production
-- async_get_details_consumption
-- async_get_daily_production
-- async_get_daily_consumption
-- async_get_identity
-- async_check_offpeak
-- async_has_offpeak
-- async_get_ecowatt
-- async_get_tempoday
-- async_get_address
-- async_get_contract
-- async_valid_access
-- async_fetch_datas
+- async_get_max_power (start: datetime, end: datetime)  Return: max power
+- async_get_details_production (start: datetime, end: datetime) Return: details production (max 7days)
+- async_get_details_consumption (start: datetime, end: datetime) Return: details consumption (max 7days)
+- async_get_daily_production (day: datetime, end: datetime) Return: production (max 1095 days)
+- async_get_daily_consumption (start: datetime, end: datetime) Return: consumption (max 1095 days)
+- async_get_identity Return: datas identity
+- async_check_offpeak (start: datetime) : check if datetime in range offpeak
+- async_has_offpeak Return boolean if offpeak detected
+- async_get_ecowatt Return: ecowatt information
+- async_get_tempoday Return: Tempo day (RED/WHITE/BLUE)
+- async_get_address Return address
+- async_get_contract Return contact
+- async_valid_access Return information access from mylelectricaldata
+- async_load (start: datetime, end: datetime) Return None - Load datas in power_datas attribut
+- async_refresh Return None - Refresh power_datas , tempo_day and ecowatt attributs.
 
 ## Get started
 
