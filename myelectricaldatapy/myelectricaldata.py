@@ -87,9 +87,10 @@ class EnedisAnalytics:
         """
         in_df = pd.DataFrame()
         for intervall in intervalls:
+            start = intervall[0].time()
+            end = self._midnightminus(intervall[1]).time()
             df2 = self.df[
-                (self.df.date.dt.time >= intervall[0].time())
-                & (self.df.date.dt.time < intervall[1].time())
+                (self.df.date.dt.time > start) & (self.df.date.dt.time <= end)
             ]
             in_df = pd.concat([in_df, df2], ignore_index=True)
 
@@ -97,7 +98,7 @@ class EnedisAnalytics:
 
         if groupby:
             in_df = (
-                in_df.groupby(pd.Grouper(key="date", freq="H"))["value"]
+                in_df.groupby(pd.Grouper(key="date", freq=freq))["value"]
                 .sum()
                 .reset_index()
             )
