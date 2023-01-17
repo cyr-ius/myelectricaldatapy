@@ -5,6 +5,7 @@ import logging
 import re
 from datetime import date
 from datetime import datetime as dt
+from datetime import timedelta
 from typing import Any, Optional, Tuple
 
 import pandas as pd
@@ -51,6 +52,8 @@ class EnedisAnalytics:
                 self.df["date"], utc=True, format="%Y-%m-%d %H:%M:%S"
             )
 
+        self.df["date"] = self.df["date"].transform(self._midnightminus)
+
         if intervals:
             self.df = self._get_data_interval(intervals, groupby, freq, summary, cumsum)
 
@@ -61,6 +64,12 @@ class EnedisAnalytics:
         if interval and len(rslt := re.findall("PT([0-9]{2})M", interval)) == 1:
             return int(rslt[0]) / 60
         return 1
+
+    def _midnightminus(self, date: dt) -> dt:
+        if date.time() == dt.strptime("00:00:00", "%H:%M:%S").time():
+            date = date - timedelta(minutes=1)
+            return date
+        return date
 
     def _get_data_interval(
         self,
