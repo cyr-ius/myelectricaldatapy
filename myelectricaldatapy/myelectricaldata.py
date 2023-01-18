@@ -34,8 +34,20 @@ class EnedisAnalytics:
         cumsum: float = 0,
     ) -> Any:
         """Convert datas to analyze."""
-        if start_date and not self.df.empty:
-            self.df = self.df[(self.df["date"] > start_date)]
+        if not self.df.empty:
+            if convertUTC:
+                self.df["date"] = pd.to_datetime(
+                    self.df["date"], utc=True, format="%Y-%m-%d %H:%M:%S"
+                )
+            else:
+                self.df["date"] = pd.to_datetime(
+                    self.df["date"], utc=False, format="%Y-%m-%d %H:%M:%S"
+                )
+
+            self.df["date"] = self.df["date"].transform(self._midnightminus)
+
+            if start_date:
+                self.df = self.df[(self.df["date"] > f"{start_date} 23:59:59")]
 
         if self.df.empty:
             return self.df.to_dict(orient="records")
@@ -47,12 +59,6 @@ class EnedisAnalytics:
             self.df["value"] = (
                 pd.to_numeric(self.df["value"]) / 1000 * self.df["interval_length"]
             )
-        if convertUTC:
-            self.df["date"] = pd.to_datetime(
-                self.df["date"], utc=True, format="%Y-%m-%d %H:%M:%S"
-            )
-
-        self.df["date"] = self.df["date"].transform(self._midnightminus)
 
         if intervals:
             self.df = self._get_data_interval(intervals, groupby, freq, summary, cumsum)
@@ -66,6 +72,10 @@ class EnedisAnalytics:
         return 1
 
     def _midnightminus(self, date: dt) -> dt:
+        """Subtracts one minute.
+
+        to avoid taking midnight on the next day
+        """
         if date.time() == dt.strptime("00:00:00", "%H:%M:%S").time():
             date = date - timedelta(minutes=1)
             return date
@@ -79,12 +89,7 @@ class EnedisAnalytics:
         summary: bool = False,
         cumsum: float = 0,
     ) -> pd.DataFrame:
-        """Group date from range time.
-
-        Returns a tuple
-        First dict contains the data in the interval
-        and the second dict contains the data outside
-        """
+        """Group date from range time."""
         in_df = pd.DataFrame()
         for intervall in intervalls:
             start = intervall[0].time()
@@ -94,8 +99,6 @@ class EnedisAnalytics:
             ]
             in_df = pd.concat([in_df, df2], ignore_index=True)
 
-        # out_df = self.df[~self.df.isin(in_df)].dropna()
-
         if groupby:
             in_df = (
                 in_df.groupby(pd.Grouper(key="date", freq=freq))["value"]
@@ -104,17 +107,9 @@ class EnedisAnalytics:
             )
             in_df = in_df[in_df.value != 0]
 
-            # out_df = (
-            #     out_df.groupby(pd.Grouper(key="date", freq="H"))["value"]
-            #     .sum()
-            #     .reset_index()
-            # )
-
         if summary:
             in_df["sum_value"] = in_df.value.cumsum() + cumsum
-            # out_df["sum_value"] = out_df.value.cumsum() + cumsum
 
-        # return in_df, out_df
         return in_df
 
     def set_price(
