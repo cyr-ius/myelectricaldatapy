@@ -85,9 +85,10 @@ async def test_analytcis() -> None:
     dataset = DATASET["meter_reading"]["interval_reading"]
     cumsum = 62.533
     intervals = [
-        (dt.strptime("01H30", "%HH%M"), dt.strptime("08H00", "%HH%M")),
-        (dt.strptime("12H30", "%HH%M"), dt.strptime("14H00", "%HH%M")),
+        (dt.strptime("01:30:00", "%H:%M:%S"), dt.strptime("08:00:00", "%H:%M:%S")),
+        (dt.strptime("12:30:00", "%H:%M:%S"), dt.strptime("14:00:00", "%H:%M:%S")),
     ]
+    intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
     analytics = EnedisAnalytics(dataset)
     resultat = analytics.get_data_analytcis(
         convertKwh=True,
@@ -99,12 +100,20 @@ async def test_analytcis() -> None:
         cumsum=cumsum,
     )
     print(resultat)
+    resultat = analytics.set_price(resultat, 0.1641, True)
+    assert resultat[0]["value"] == 18.852
+    # Other
     analytics = EnedisAnalytics(dataset)
     cumsum = 744.86
     intervals = [
-        (dt.strptime("00H00", "%HH%M"), dt.strptime("01H30", "%HH%M")),
-        (dt.strptime("08H00", "%HH%M"), dt.strptime("12H30", "%HH%M")),
-        (dt.strptime("14H00", "%HH%M"), dt.strptime("00H00", "%HH%M")),
+        (dt.strptime("00:00:00", "%H:%M:%S"), dt.strptime("01:30:00", "%H:%M:%S")),
+        (dt.strptime("08:00:00", "%H:%M:%S"), dt.strptime("12:30:00", "%H:%M:%S")),
+        (dt.strptime("14:00:00", "%H:%M:%S"), dt.strptime("00:00:00", "%H:%M:%S")),
+    ]
+    intervals = [
+        ("00:00:00", "01:30:00"),
+        ("08:00:00", "12:30:00"),
+        ("14:00:00", "00:00:00"),
     ]
     resultat = analytics.get_data_analytcis(
         convertKwh=True,
@@ -116,8 +125,9 @@ async def test_analytcis() -> None:
         cumsum=cumsum,
     )
     print(resultat)
-    offpeak = analytics.set_price(resultat, 0.1641, True)
-    assert offpeak[0]["value"] == 29.63
+    resultat = analytics.set_price(resultat, 0.1641, True)
+    assert resultat[0]["value"] == 29.63
+    # Other
     value = analytics.get_last_value(resultat, "date", "sum_value")
     assert value == 920.566
 

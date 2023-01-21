@@ -27,7 +27,7 @@ class EnedisAnalytics:
         convertKwh: bool = False,
         convertUTC: bool = False,
         start_date: str | None = None,
-        intervals: list[Tuple[dt, dt]] | None = None,
+        intervals: list[Tuple[str, str]] | None = None,
         groupby: str | None = None,
         freq: str = "H",
         summary: bool = False,
@@ -49,13 +49,19 @@ class EnedisAnalytics:
             if start_date:
                 self.df = self.df[(self.df["date"] > f"{start_date} 23:59:59")]
 
+            self.df.index = self.df["date"]
+
         if self.df.empty:
             return self.df.to_dict(orient="records")
 
-        if convertKwh:
+        if self.df.get("interval_length") is not None:
             self.df["interval_length"] = self.df["interval_length"].transform(
                 self._weighted_interval
             )
+        else:
+            self.df["interval_length"] = 1
+
+        if convertKwh:
             self.df["value"] = (
                 pd.to_numeric(self.df["value"]) / 1000 * self.df["interval_length"]
             )
@@ -83,7 +89,7 @@ class EnedisAnalytics:
 
     def _get_data_interval(
         self,
-        intervalls: list[Tuple[dt, dt]],
+        intervalls: list[Tuple[str, str]],
         groupby: str | None = None,
         freq: str = "H",
         summary: bool = False,
@@ -92,8 +98,8 @@ class EnedisAnalytics:
         """Group date from range time."""
         in_df = pd.DataFrame()
         for intervall in intervalls:
-            start = intervall[0].time()
-            end = self._midnightminus(intervall[1]).time()
+            start = pd.to_datetime(intervall[0]).time()
+            end = self._midnightminus(pd.to_datetime(intervall[1])).time()
             df2 = self.df[
                 (self.df.date.dt.time > start) & (self.df.date.dt.time <= end)
             ]
