@@ -6,11 +6,12 @@ import re
 from datetime import date
 from datetime import datetime as dt
 from datetime import timedelta
-from typing import Any, Optional, Tuple
+from typing import Any, Collection, Optional, Tuple
 
 import pandas as pd
 
 from .auth import TIMEOUT, EnedisAuth
+from .exceptions import LimitReached
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -18,7 +19,7 @@ _LOGGER = logging.getLogger(__name__)
 class EnedisAnalytics:
     """Data analaytics."""
 
-    def __init__(self, data: dict[str, Any]) -> None:
+    def __init__(self, data: Collection[Collection[str]]) -> None:
         """Initialize Dataframe."""
         self.df = pd.DataFrame(data)
 
@@ -71,15 +72,15 @@ class EnedisAnalytics:
             return int(rslt[0]) / 60
         return 1
 
-    def _midnightminus(self, date: dt) -> dt:
+    def _midnightminus(self, dt_date: dt) -> dt:
         """Subtracts one minute.
 
         to avoid taking midnight on the next day
         """
-        if date.time() == dt.strptime("00:00:00", "%H:%M:%S").time():
-            date = date - timedelta(minutes=1)
-            return date
-        return date
+        if dt_date.time() == dt.strptime("00:00:00", "%H:%M:%S").time():
+            dt_date = dt_date - timedelta(minutes=1)
+            return dt_date
+        return dt_date
 
     def _get_data_interval(
         self,
@@ -132,7 +133,7 @@ class EnedisAnalytics:
         df = pd.DataFrame(data)
         if not df.empty:
             df = df.sort_values(by=orderby)
-            return df[value].iloc[-1]
+            return df[value].iloc[-1]  # pylint: disable=unsubscriptable-object
 
 
 class EnedisByPDL:
@@ -141,31 +142,25 @@ class EnedisByPDL:
     def __init__(
         self,
         token: str,
-        pdl: str,
         session: Optional[Any] = None,
         timeout: int = TIMEOUT,
-        production: bool = False,
         tempo: bool = False,
         ecowatt: bool = False,
     ) -> None:
         """Initialize."""
         self.auth = EnedisAuth(token, session, timeout)
-        self.pdl = pdl
-        self.b_production = production
-        self.b_tempo = tempo
-        self.b_ecowatt = ecowatt
+        self._b_tempo = tempo
+        self._b_ecowatt = ecowatt
         self.offpeaks: list[str] = []
         self.dt_offpeak: list[dt] = []
-        self.power_datas: dict[str, Any] = {}
         self.last_refresh_date: date | None = None
         self.contract: dict[str, Any] = {}
         self.tempo_day: str | None = None
         self.ecowatt: dict[str, Any] = {}
         self.valid_access: dict[str, Any] = {}
-        self.models: list[Tuple[str, dt, dt]] = []
 
     async def async_fetch_datas(
-        self, service: str, start: dt | None = None, end: dt | None = None
+        self, service: str, pdl: str, start: dt | None = None, end: dt | None = None
     ) -> Any:
         """Retrieve date from service.
 
@@ -174,25 +169,29 @@ class EnedisByPDL:
                     daily_consumption, daily_production,
                     consumption_load_curve, production_load_curve
         """
+        await self.async_load(pdl)
+        if self.valid_access.get("quota_reached", True):
+            raise LimitReached(self.valid_access.get("information"))
+
         path_range = ""
         if start and end:
             start_date = start.strftime("%Y-%m-%d")
             end_date = end.strftime("%Y-%m-%d")
             path_range = f"/start/{start_date}/end/{end_date}"
-        path = f"{service}/{self.pdl}{path_range}"
+        path = f"{service}/{pdl}{path_range}"
         return await self.auth.request(path=path)
 
-    async def async_valid_access(self) -> Any:
+    async def async_valid_access(self, pdl: str) -> Any:
         """Return valid access."""
-        return await self.async_fetch_datas("valid_access")
+        return await self.async_fetch_datas("valid_access", pdl)
 
-    async def async_get_contract(self) -> Any:
+    async def async_get_contract(self, pdl: str) -> Any:
         """Return contract information."""
         contract = {}
-        contracts = await self.async_fetch_datas("contracts")
+        contracts = await self.async_fetch_datas("contracts", pdl)
         usage_points = contracts.get("customer", {}).get("usage_points", "")
         for usage_point in usage_points:
-            if usage_point.get("usage_point", {}).get("usage_point_id") == self.pdl:
+            if usage_point.get("usage_point", {}).get("usage_point_id") == pdl:
                 contract = usage_point.get("contracts", {})
                 if offpeak_hours := contract.get("offpeak_hours"):
                     self.offpeaks = re.findall("(?:(\\w+)-(\\w+))+", offpeak_hours)
@@ -205,23 +204,23 @@ class EnedisByPDL:
                     ]
         return contract
 
-    async def async_get_contracts(self) -> Any:
+    async def async_get_contracts(self, pdl: str) -> Any:
         """Return all contracts information."""
-        return await self.async_fetch_datas("contracts")
+        return await self.async_fetch_datas("contracts", pdl)
 
-    async def async_get_address(self) -> Any:
+    async def async_get_address(self, pdl: str) -> Any:
         """Return adress information."""
         address = {}
-        addresses = await self.async_fetch_datas("addresses")
+        addresses = await self.async_fetch_datas("addresses", pdl)
         usage_points = addresses.get("customer", {}).get("usage_points", "")
         for usage_point in usage_points:
-            if usage_point.get("usage_point", {}).get("usage_point_id") == self.pdl:
+            if usage_point.get("usage_point", {}).get("usage_point_id") == pdl:
                 address = usage_point.get("usage_point")
         return address
 
-    async def async_get_addresses(self) -> Any:
+    async def async_get_addresses(self, pdl: str) -> Any:
         """Return all adresses information."""
-        return await self.async_fetch_datas("adresses")
+        return await self.async_fetch_datas("adresses", pdl)
 
     async def async_get_tempoday(self) -> Any:
         """Return Tempo Day."""
@@ -233,15 +232,15 @@ class EnedisByPDL:
         day = dt.now().strftime("%Y-%m-%d")
         return await self.auth.request(path=f"rte/ecowatt/{day}/{day}")
 
-    async def async_has_offpeak(self) -> bool:
+    async def async_has_offpeak(self, pdl: str) -> bool:
         """Has offpeak hours."""
         if not self.offpeaks:
-            await self.async_get_contract()
+            await self.async_get_contract(pdl)
         return len(self.offpeaks) > 0
 
-    async def async_check_offpeak(self, start: dt) -> bool:
+    async def async_check_offpeak(self, pdl: str, start: dt) -> bool:
         """Return offpeak status."""
-        if await self.async_has_offpeak() is True:
+        if await self.async_has_offpeak(pdl) is True:
             start_time = start.time()
             for range_time in self.offpeaks:
                 starting = dt.strptime(range_time[0], "%HH%M").time()
@@ -250,64 +249,52 @@ class EnedisByPDL:
                     return True
         return False
 
-    async def async_get_identity(self) -> Any:
+    async def async_get_identity(self, pdl: str) -> Any:
         """Get identity."""
-        return await self.async_fetch_datas("identity")
+        return await self.async_fetch_datas("identity", pdl)
 
-    async def async_get_daily_consumption(self, start: dt, end: dt) -> Any:
+    async def async_get_daily_consumption(self, pdl: str, start: dt, end: dt) -> Any:
         """Get daily consumption."""
-        return await self.async_fetch_datas("daily_consumption", start, end)
+        return await self.async_fetch_datas("daily_consumption", pdl, start, end)
 
-    async def async_get_daily_production(self, start: dt, end: dt) -> Any:
+    async def async_get_daily_production(self, pdl: str, start: dt, end: dt) -> Any:
         """Get daily production."""
-        return await self.async_fetch_datas("daily_production", start, end)
+        return await self.async_fetch_datas("daily_production", pdl, start, end)
 
-    async def async_get_details_consumption(self, start: dt, end: dt) -> Any:
+    async def async_get_details_consumption(self, pdl: str, start: dt, end: dt) -> Any:
         """Get consumption details. (max: 7 days)."""
-        return await self.async_fetch_datas("consumption_load_curve", start, end)
+        return await self.async_fetch_datas("consumption_load_curve", pdl, start, end)
 
-    async def async_get_details_production(self, start: dt, end: dt) -> Any:
+    async def async_get_details_production(self, pdl: str, start: dt, end: dt) -> Any:
         """Get production details. (max: 7 days)."""
-        return await self.async_fetch_datas("production_load_curve", start, end)
+        return await self.async_fetch_datas("production_load_curve", pdl, start, end)
 
-    async def async_get_max_power(self, start: dt, end: dt) -> Any:
+    async def async_get_max_power(self, pdl: str, start: dt, end: dt) -> Any:
         """Get consumption max power."""
-        return await self.async_fetch_datas("daily_consumption_max_power", start, end)
+        return await self.async_fetch_datas(
+            "daily_consumption_max_power", pdl, start, end
+        )
 
     async def async_close(self) -> None:
         """Close session."""
         await self.auth.async_close()
 
-    async def async_load(self, models: list[Tuple[str, dt, dt]] | None = None) -> None:
-        """Retrieves production and consumption data.
-
-        models , list contain tuple
-        tuple : service (string) , start (datetime) , end (datetime)
-        """
-        if models is None:
-            models = self.models
-        else:
-            self.models = models
-        self.valid_access = await self.async_valid_access()
-        self.power_datas = {}
-        for model in models:
-            service = model[0]
-            start = model[1]
-            end = model[2]
-            datas = await self.async_fetch_datas(service, start, end)
-            self.power_datas.update(
-                {service: datas.get("meter_reading", {}).get("interval_reading")}
-            )
-
-        if self.last_refresh_date is None or dt.now().date() > self.last_refresh_date:
-            await self.async_get_contract()
-            if self.b_tempo:
+    async def async_load(
+        self,
+        pdl: str,
+        force: bool = False,
+    ) -> Any:
+        """Fetch datas and fill properties."""
+        self.valid_access = await self.async_valid_access(pdl)
+        if (
+            self.last_refresh_date is None
+            or dt.now().date() > self.last_refresh_date  # noqa:W503
+            or force is True  # noqa:W503
+        ):
+            await self.async_get_contract(pdl)
+            if self._b_tempo:
                 self.tempo_day = await self.async_get_tempoday()
-            if self.b_ecowatt:
+            if self._b_ecowatt:
                 self.ecowatt = await self.async_get_ecowatt()
 
         self.last_refresh_date = dt.now().date()
-
-    async def async_refresh(self) -> None:
-        """Refresh datas."""
-        await self.async_load()
