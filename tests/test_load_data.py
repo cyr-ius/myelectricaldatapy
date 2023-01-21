@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 
 import myelectricaldatapy
-from myelectricaldatapy import EnedisAnalytics, EnedisByPDL, LimitReached
+from myelectricaldatapy import EnedisAnalytics, EnedisByPDL
 
 from .consts import DATASET
 
@@ -78,24 +78,6 @@ async def test_load() -> None:
         await api.async_get_daily_production(PDL, dt.now(), dt.now())
         await api.async_get_details_production(PDL, dt.now(), dt.now())
         await api.async_close()
-
-
-@pytest.mark.asyncio
-async def test_limit_reached() -> None:
-    with patch.object(
-        EnedisByPDL, "async_get_contract", return_value=CONTRACT
-    ), patch.object(
-        EnedisByPDL, "async_valid_access", return_value=INVALID
-    ), pytest.raises(
-        LimitReached
-    ):
-        api = EnedisByPDL(token=TOKEN)
-        await api.async_fetch_datas(
-            service="comsumption_load_curve",
-            pdl=PDL,
-            start=dt.strptime("2022-12-30", "%Y-%m-%d"),
-            end=dt.strptime("2022-12-31", "%Y-%m-%d"),
-        )
 
 
 @pytest.mark.asyncio

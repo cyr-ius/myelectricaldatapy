@@ -11,7 +11,6 @@ from typing import Any, Collection, Optional, Tuple
 import pandas as pd
 
 from .auth import TIMEOUT, EnedisAuth
-from .exceptions import LimitReached
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -140,20 +139,13 @@ class EnedisByPDL:
     """Get data of pdl."""
 
     def __init__(
-        self,
-        token: str,
-        session: Optional[Any] = None,
-        timeout: int = TIMEOUT,
-        tempo: bool = False,
-        ecowatt: bool = False,
+        self, token: str, session: Optional[Any] = None, timeout: int = TIMEOUT
     ) -> None:
         """Initialize."""
         self.auth = EnedisAuth(token, session, timeout)
-        self._b_tempo = tempo
-        self._b_ecowatt = ecowatt
         self.offpeaks: list[str] = []
         self.dt_offpeak: list[dt] = []
-        self.last_refresh_date: date | None = None
+        self.last_access: date | None = None
         self.contract: dict[str, Any] = {}
         self.tempo_day: str | None = None
         self.ecowatt: dict[str, Any] = {}
@@ -169,10 +161,7 @@ class EnedisByPDL:
                     daily_consumption, daily_production,
                     consumption_load_curve, production_load_curve
         """
-        await self.async_load(pdl)
-        if self.valid_access.get("quota_reached", True):
-            raise LimitReached(self.valid_access.get("information"))
-
+        self.last_access = dt.now()
         path_range = ""
         if start and end:
             start_date = start.strftime("%Y-%m-%d")
@@ -278,23 +267,3 @@ class EnedisByPDL:
     async def async_close(self) -> None:
         """Close session."""
         await self.auth.async_close()
-
-    async def async_load(
-        self,
-        pdl: str,
-        force: bool = False,
-    ) -> Any:
-        """Fetch datas and fill properties."""
-        self.valid_access = await self.async_valid_access(pdl)
-        if (
-            self.last_refresh_date is None
-            or dt.now().date() > self.last_refresh_date  # noqa:W503
-            or force is True  # noqa:W503
-        ):
-            await self.async_get_contract(pdl)
-            if self._b_tempo:
-                self.tempo_day = await self.async_get_tempoday()
-            if self._b_ecowatt:
-                self.ecowatt = await self.async_get_ecowatt()
-
-        self.last_refresh_date = dt.now().date()
