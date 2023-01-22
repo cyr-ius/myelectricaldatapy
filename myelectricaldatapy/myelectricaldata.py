@@ -219,8 +219,9 @@ class EnedisByPDL:
 
     async def async_get_tempoday(self) -> Any:
         """Return Tempo Day."""
-        day = dt.now().strftime("%Y-%m-%d")
-        return await self.auth.request(path=f"rte/tempo/{day}/{day}")
+        start = dt.now().strftime("%Y-%m-%d")
+        end = (dt.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+        return await self.auth.request(path=f"rte/tempo/{start}/{end}")
 
     async def async_get_ecowatt(self) -> Any:
         """Return Ecowatt information."""
