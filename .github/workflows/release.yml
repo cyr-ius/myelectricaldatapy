@@ -1,9 +1,8 @@
 name: create-release
 on:
   push:
-    # Sequence of patterns matched against refs/tags
     tags:
-      - "*" # Push events to matching v*, i.e. v1.0, v4.0.1
+      - "*.*.*" # Push events to matching i.e. 1.0.0, 4.0.1
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -23,7 +22,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
+          release_name: ${{ github.ref }}
           body: ${{ steps.changelog.outputs.changelog }}
           draft: false
           prerelease: false
