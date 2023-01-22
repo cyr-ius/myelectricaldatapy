@@ -1,6 +1,9 @@
 name: create-release
 on:
-  release:
+  push:
+    # Sequence of patterns matched against refs/tags
+    tags:
+      - '*' # Push events to matching v*, i.e. v1.0, v4.0.1
 jobs:
   release:
     runs-on: ubuntu-latest
