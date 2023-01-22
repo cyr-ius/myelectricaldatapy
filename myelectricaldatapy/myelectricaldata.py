@@ -224,8 +224,9 @@ class EnedisByPDL:
 
     async def async_get_ecowatt(self) -> Any:
         """Return Ecowatt information."""
-        day = dt.now().strftime("%Y-%m-%d")
-        return await self.auth.request(path=f"rte/ecowatt/{day}/{day}")
+        start = dt.now().strftime("%Y-%m-%d")
+        end = (dt.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+        return await self.auth.request(path=f"rte/ecowatt/{start}/{end}")
 
     async def async_has_offpeak(self, pdl: str) -> bool:
         """Has offpeak hours."""
