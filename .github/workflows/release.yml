@@ -1,9 +1,6 @@
 name: create-release
 on:
-  push:
-    # Sequence of patterns matched against refs/tags
-    tags:
-
+  release:
 jobs:
   release:
     runs-on: ubuntu-latest
