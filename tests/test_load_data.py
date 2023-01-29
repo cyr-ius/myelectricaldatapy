@@ -111,6 +111,22 @@ async def test_analytcis() -> None:
     )
     resultat = analytics.set_price(resultat, 0.1641, True)
     assert resultat[0]["value"] == 18.852
+    print(resultat)
+    # Inverse
+    analytics = EnedisAnalytics(dataset)
+    resultat = analytics.get_data_analytcis(
+        convertKwh=True,
+        convertUTC=True,
+        intervals=intervals,
+        freq="D",
+        groupby="date",
+        summary=True,
+        cumsum=cumsum,
+        reverse=True,
+    )
+    resultat = analytics.set_price(resultat, 0.1641, True)
+    assert resultat[0]["value"] == 48.482
+    print(resultat)
     # Other
     analytics = EnedisAnalytics(dataset)
     cumsum = 744.86

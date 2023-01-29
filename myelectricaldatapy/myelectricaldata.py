@@ -32,6 +32,7 @@ class EnedisAnalytics:
         freq: str = "H",
         summary: bool = False,
         cumsum: float = 0,
+        reverse: bool = False,
     ) -> Any:
         """Convert datas to analyze."""
         if not self.df.empty:
@@ -67,7 +68,9 @@ class EnedisAnalytics:
             )
 
         if intervals:
-            self.df = self._get_data_interval(intervals, groupby, freq, summary, cumsum)
+            self.df = self._get_data_interval(
+                intervals, groupby, freq, summary, cumsum, reverse
+            )
 
         return self.df.to_dict(orient="records")
 
@@ -94,6 +97,7 @@ class EnedisAnalytics:
         freq: str = "H",
         summary: bool = False,
         cumsum: float = 0,
+        reverse: bool = False,
     ) -> pd.DataFrame:
         """Group date from range time."""
         in_df = pd.DataFrame()
@@ -104,6 +108,9 @@ class EnedisAnalytics:
                 (self.df.date.dt.time > start) & (self.df.date.dt.time <= end)
             ]
             in_df = pd.concat([in_df, df2], ignore_index=True)
+
+        if reverse:
+            in_df = self.df[~self.df.isin(in_df)].dropna()
 
         if groupby:
             in_df = (
