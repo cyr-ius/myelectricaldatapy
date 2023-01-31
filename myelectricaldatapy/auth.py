@@ -44,10 +44,10 @@ class EnedisAuth:
                 method, f"{URL}/{path}", **kwargs, headers=headers, timeout=self.timeout
             )
             response = await resp.json()
-            _LOGGER.debug("Response %s", response)
+            _LOGGER.debug("Response %s (%s)", response, resp.status)
             if resp.status == 409:
                 raise LimitReached(response.get("detail"))
-            if resp.status == 422:
+            if resp.status != 200:
                 raise GatewayException(response.get("detail"))
         except ClientError as error:
             raise EnedisException from error
