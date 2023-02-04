@@ -51,5 +51,4 @@ class EnedisAuth:
                 raise GatewayException(response.get("detail"))
         except ClientError as error:
             raise EnedisException from error
-        else:
-            return response
+        return response
