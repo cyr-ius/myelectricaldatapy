@@ -159,10 +159,6 @@ class EnedisByPDL:
         self.offpeaks: list[str] = []
         self.dt_offpeak: list[dt] = []
         self.last_access: date | None = None
-        self.contract: dict[str, Any] = {}
-        self.tempo_day: str | None = None
-        self.ecowatt: dict[str, Any] = {}
-        self.valid_access: dict[str, Any] = {}
 
     async def async_fetch_datas(
         self, service: str, pdl: str, start: dt | None = None, end: dt | None = None
@@ -186,6 +182,11 @@ class EnedisByPDL:
     async def async_valid_access(self, pdl: str) -> Any:
         """Return valid access."""
         return await self.async_fetch_datas("valid_access", pdl)
+
+    async def async_has_access(self, pdl: str) -> bool:
+        """Check valid access."""
+        access = await self.async_valid_access(pdl)
+        return access.get("valid", False) is True
 
     async def async_get_contract(self, pdl: str) -> Any:
         """Return contract information."""

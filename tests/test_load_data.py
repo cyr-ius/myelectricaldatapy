@@ -50,6 +50,9 @@ async def test_valid_access() -> None:
         resultat = await api.async_valid_access(PDL)
         assert resultat["valid"] is True
 
+        resultat = await api.async_has_access(PDL)
+        assert resultat is True
+
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=INVALID_ACCESS
     ):
@@ -72,7 +75,7 @@ async def test_fetch_data() -> None:
         )
         assert (
             resultat["meter_reading"]["interval_reading"]
-            == DATASET["meter_reading"]["interval_reading"]
+            == DATASET["meter_reading"]["interval_reading"]  # noqa
         )
 
 
@@ -110,7 +113,7 @@ async def test_analytcis() -> None:
         cumsum=cumsum,
     )
     resultat = analytics.set_price(resultat, 0.1641, True)
-    assert resultat[0]["value"] == 18.852
+    assert resultat[0]["value"] == 18.852  # pylint: disable="unsubscriptable-object"
     print(resultat)
     # Inverse
     analytics = EnedisAnalytics(dataset)
@@ -125,7 +128,7 @@ async def test_analytcis() -> None:
         reverse=True,
     )
     resultat = analytics.set_price(resultat, 0.1641, True)
-    assert resultat[0]["value"] == 48.482
+    assert resultat[0]["value"] == 48.482  # pylint: disable="unsubscriptable-object"
     print(resultat)
     # Other
     analytics = EnedisAnalytics(dataset)
@@ -145,7 +148,7 @@ async def test_analytcis() -> None:
         cumsum=cumsum,
     )
     resultat = analytics.set_price(resultat, 0.1641, True)
-    assert resultat[0]["value"] == 29.63
+    assert resultat[0]["value"] == 29.63  # pylint: disable="unsubscriptable-object"
     # Other
     value = analytics.get_last_value(resultat, "date", "sum_value")
     assert value == 920.566
@@ -180,7 +183,7 @@ async def test_empty() -> None:
         groupby="date",
         summary=True,
     )
-    analytics = EnedisAnalytics(None)
+    analytics = EnedisAnalytics(None)  # type: ignore
     analytics.get_data_analytcis(
         convertKwh=True,
         convertUTC=True,
