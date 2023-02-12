@@ -113,11 +113,8 @@ class EnedisAnalytics:
             in_df = self.df[~self.df.isin(in_df)].dropna()
 
         if groupby:
-            in_df = (
-                in_df.groupby(pd.Grouper(key="date", freq=freq))["value"]
-                .sum()
-                .reset_index()
-            )
+            in_df = in_df.groupby(pd.Grouper(key="date", freq=freq))["value"].sum()
+            in_df = in_df.groupby(pd.Grouper(freq="H")).sum().reset_index()
             in_df = in_df[in_df.value != 0]
 
         if summary:

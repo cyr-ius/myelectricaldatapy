@@ -107,13 +107,30 @@ async def test_analytcis() -> None:
         convertKwh=True,
         convertUTC=True,
         intervals=intervals,
-        freq="D",
+        freq="30T",
         groupby="date",
         summary=True,
         cumsum=cumsum,
     )
     resultat = analytics.set_price(resultat, 0.1641, True)
-    assert resultat[0]["value"] == 18.852  # pylint: disable="unsubscriptable-object"
+    assert resultat[0]["value"] == 2.007  # pylint: disable="unsubscriptable-object"
+    # assert resultat[0]["value"] == 18.852  # pylint: disable="unsubscriptable-object"
+    print(resultat)
+    intervals = [
+        ("00:00:00", "01:30:00"),
+        ("08:00:00", "12:30:00"),
+        ("14:00:00", "00:00:00"),
+    ]
+    analytics = EnedisAnalytics(dataset)
+    resultat = analytics.get_data_analytcis(
+        convertKwh=True,
+        convertUTC=True,
+        intervals=intervals,
+        freq="30T",
+        groupby="date",
+        summary=True,
+        cumsum=cumsum,
+    )
     print(resultat)
     # Inverse
     analytics = EnedisAnalytics(dataset)
@@ -121,14 +138,15 @@ async def test_analytcis() -> None:
         convertKwh=True,
         convertUTC=True,
         intervals=intervals,
-        freq="D",
+        freq="H",
         groupby="date",
         summary=True,
         cumsum=cumsum,
         reverse=True,
     )
     resultat = analytics.set_price(resultat, 0.1641, True)
-    assert resultat[0]["value"] == 48.482  # pylint: disable="unsubscriptable-object"
+    assert resultat[0]["value"] == 0.181  # pylint: disable="unsubscriptable-object"
+    # assert resultat[0]["value"] == 48.482  # pylint: disable="unsubscriptable-object"
     print(resultat)
     # Other
     analytics = EnedisAnalytics(dataset)
@@ -161,6 +179,7 @@ async def test_analytcis() -> None:
         summary=False,
         cumsum=cumsum,
     )
+    assert resultat[0]["value"] == 29.63  # pylint: disable="unsubscriptable-object"
 
 
 @pytest.mark.asyncio
