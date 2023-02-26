@@ -105,7 +105,7 @@ async def test_analytcis() -> None:
     analytics = EnedisAnalytics(dataset)
     resultat = analytics.get_data_analytcis(
         convertKwh=True,
-        convertUTC=True,
+        convertUTC=False,
         intervals=intervals,
         freq="30T",
         groupby="date",
@@ -124,7 +124,7 @@ async def test_analytcis() -> None:
     analytics = EnedisAnalytics(dataset)
     resultat = analytics.get_data_analytcis(
         convertKwh=True,
-        convertUTC=True,
+        convertUTC=False,
         intervals=intervals,
         freq="30T",
         groupby="date",
@@ -136,7 +136,7 @@ async def test_analytcis() -> None:
     analytics = EnedisAnalytics(dataset)
     resultat = analytics.get_data_analytcis(
         convertKwh=True,
-        convertUTC=True,
+        convertUTC=False,
         intervals=intervals,
         freq="H",
         groupby="date",
@@ -158,7 +158,7 @@ async def test_analytcis() -> None:
     ]
     resultat = analytics.get_data_analytcis(
         convertKwh=True,
-        convertUTC=True,
+        convertUTC=False,
         intervals=intervals,
         freq="D",
         groupby="date",
@@ -168,16 +168,17 @@ async def test_analytcis() -> None:
     resultat = analytics.set_price(resultat, 0.1641, True)
     assert resultat[0]["value"] == 29.63  # pylint: disable="unsubscriptable-object"
     # Other
-    value = analytics.get_last_value(resultat, "date", "sum_value")
-    assert value == 920.566
+    resultat = analytics.get_last_value(resultat, "date", "sum_value")
+    assert resultat == 920.566
+
+    analytics = EnedisAnalytics(dataset)
     resultat = analytics.get_data_analytcis(
-        convertKwh=False,
+        convertKwh=True,
         convertUTC=False,
         intervals=intervals,
         freq="D",
         groupby="date",
-        summary=False,
-        cumsum=cumsum,
+        summary=True,
     )
     assert resultat[0]["value"] == 29.63  # pylint: disable="unsubscriptable-object"
 

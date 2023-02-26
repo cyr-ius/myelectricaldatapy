@@ -18,6 +18,8 @@ _LOGGER = logging.getLogger(__name__)
 class EnedisAnalytics:
     """Data analaytics."""
 
+    local_timezone = dt.now().astimezone().tzinfo
+
     def __init__(self, data: Collection[Collection[str]]) -> None:
         """Initialize Dataframe."""
         self.df = pd.DataFrame(data)
@@ -36,36 +38,41 @@ class EnedisAnalytics:
     ) -> Any:
         """Convert datas to analyze."""
         if not self.df.empty:
+            # Convert str to datetime
+            self.df.date = pd.to_datetime(self.df.date, format="%Y-%m-%d %H:%M:%S")
+            self.df.date = self.df.date.dt.tz_localize(self.local_timezone)
+
             if convertUTC:
-                self.df["date"] = pd.to_datetime(
-                    self.df["date"], utc=True, format="%Y-%m-%d %H:%M:%S"
-                )
-            else:
-                self.df["date"] = pd.to_datetime(
-                    self.df["date"], utc=False, format="%Y-%m-%d %H:%M:%S"
+                self.df.date = pd.to_datetime(
+                    self.df.date, utc=True, format="%Y-%m-%d %H:%M:%S"
                 )
 
-            self.df["date"] = self.df["date"].transform(self._midnightminus)
+            # Substract 1 minute at midnight
+            # because Pandas considers midnight as the next day while
+            # for Enedis it is the day before
+            self.df.date = self.df.date.transform(self._midnightminus)
 
             if start_date:
-                self.df = self.df[(self.df["date"] > f"{start_date} 23:59:59")]
+                self.df = self.df[(self.df.date > f"{start_date} 23:59:59")]
 
-            self.df.index = self.df["date"]
+            self.df.index = self.df.date
 
         if self.df.empty:
             return self.df.to_dict(orient="records")
 
         if self.df.get("interval_length") is not None:
-            self.df["interval_length"] = self.df["interval_length"].transform(
+            self.df.interval_length = self.df.interval_length.transform(
                 self._weighted_interval
             )
         else:
-            self.df["interval_length"] = 1
+            self.df.interval_length = 1
 
         if convertKwh:
-            self.df["value"] = (
-                pd.to_numeric(self.df["value"]) / 1000 * self.df["interval_length"]
+            self.df.value = (
+                pd.to_numeric(self.df.value) / 1000 * self.df.interval_length
             )
+        else:
+            self.df.value = pd.to_numeric(self.df.value) * self.df.interval_length
 
         if intervals:
             self.df = self._get_data_interval(
@@ -102,8 +109,13 @@ class EnedisAnalytics:
         """Group date from range time."""
         in_df = pd.DataFrame()
         for intervall in intervalls:
-            start = pd.to_datetime(intervall[0]).time()
-            end = self._midnightminus(pd.to_datetime(intervall[1])).time()
+            # Convert str to datetime
+            start = pd.to_datetime(intervall[0], format="%H:%M:%S")
+            end = pd.to_datetime(intervall[1], format="%H:%M:%S")
+            # Get Time
+            start = start.time()
+            end = self._midnightminus(end).time()
+            # Check interval
             df2 = self.df[
                 (self.df.date.dt.time > start) & (self.df.date.dt.time <= end)
             ]
