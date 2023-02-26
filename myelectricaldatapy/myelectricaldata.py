@@ -117,7 +117,7 @@ class EnedisAnalytics:
             end = self._midnightminus(end).time()
             # Check interval
             df2 = self.df[
-                (self.df.date.dt.time > start) & (self.df.date.dt.time <= end)
+                (self.df.date.dt.time >= start) & (self.df.date.dt.time < end)
             ]
             in_df = pd.concat([in_df, df2], ignore_index=True)
 
