@@ -234,17 +234,33 @@ class EnedisByPDL:
         """Return all adresses information."""
         return await self.async_fetch_datas("adresses", pdl)
 
-    async def async_get_tempoday(self) -> Any:
+    async def async_get_tempoday(
+        self, start: dt | None = None, end: dt | None = None
+    ) -> Any:
         """Return Tempo Day."""
-        start = dt.now().strftime("%Y-%m-%d")
-        end = (dt.now() + timedelta(days=1)).strftime("%Y-%m-%d")
-        return await self.auth.request(path=f"rte/tempo/{start}/{end}")
+        str_start = (
+            start.strftime("%Y-%m-%d") if start else dt.now().strftime("%Y-%m-%d")
+        )
+        str_end = (
+            end.strftime("%Y-%m-%d")
+            if end
+            else (dt.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+        )
+        return await self.auth.request(path=f"rte/tempo/{str_start}/{str_end}")
 
-    async def async_get_ecowatt(self) -> Any:
+    async def async_get_ecowatt(
+        self, start: dt | None = None, end: dt | None = None
+    ) -> Any:
         """Return Ecowatt information."""
-        start = dt.now().strftime("%Y-%m-%d")
-        end = (dt.now() + timedelta(days=1)).strftime("%Y-%m-%d")
-        return await self.auth.request(path=f"rte/ecowatt/{start}/{end}")
+        str_start = (
+            start.strftime("%Y-%m-%d") if start else dt.now().strftime("%Y-%m-%d")
+        )
+        str_end = (
+            end.strftime("%Y-%m-%d")
+            if end
+            else (dt.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+        )
+        return await self.auth.request(path=f"rte/ecowatt/{str_start}/{str_end}")
 
     async def async_has_offpeak(self, pdl: str) -> bool:
         """Has offpeak hours."""
