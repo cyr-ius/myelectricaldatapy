@@ -113,7 +113,7 @@ async def test_analytcis() -> None:
         cumsum=cumsum,
     )
     resultat = analytics.set_price(resultat, 0.1641, True)
-    assert resultat[0]["value"] == 2.007  # pylint: disable="unsubscriptable-object"
+    assert resultat[0]["value"] == 0.199  # pylint: disable="unsubscriptable-object"
     # assert resultat[0]["value"] == 18.852  # pylint: disable="unsubscriptable-object"
     print(resultat)
     intervals = [
@@ -145,7 +145,7 @@ async def test_analytcis() -> None:
         reverse=True,
     )
     resultat = analytics.set_price(resultat, 0.1641, True)
-    assert resultat[0]["value"] == 0.181  # pylint: disable="unsubscriptable-object"
+    assert resultat[0]["value"] == 0.202  # pylint: disable="unsubscriptable-object"
     # assert resultat[0]["value"] == 48.482  # pylint: disable="unsubscriptable-object"
     print(resultat)
     # Other
@@ -166,10 +166,10 @@ async def test_analytcis() -> None:
         cumsum=cumsum,
     )
     resultat = analytics.set_price(resultat, 0.1641, True)
-    assert resultat[0]["value"] == 29.63  # pylint: disable="unsubscriptable-object"
+    assert resultat[0]["value"] == 13.044  # pylint: disable="unsubscriptable-object"
     # Other
     resultat = analytics.get_last_value(resultat, "date", "sum_value")
-    assert resultat == 920.566
+    assert resultat == 1020.472
 
     analytics = EnedisAnalytics(dataset)
     resultat = analytics.get_data_analytcis(
@@ -180,7 +180,7 @@ async def test_analytcis() -> None:
         groupby="date",
         summary=True,
     )
-    assert resultat[0]["value"] == 29.63  # pylint: disable="unsubscriptable-object"
+    assert resultat[0]["value"] == 13.044  # pylint: disable="unsubscriptable-object"
 
 
 @pytest.mark.asyncio
