@@ -74,10 +74,16 @@ class EnedisAnalytics:
         else:
             self.df.value = pd.to_numeric(self.df.value) * self.df.interval_length
 
-        if intervals:
-            self.df = self._get_data_interval(
-                intervals, groupby, freq, summary, cumsum, reverse
-            )
+        if intervals and freq != "D":
+            self.df = self._get_data_interval(intervals, reverse)
+
+        if groupby:
+            self.df = self.df.groupby(pd.Grouper(key="date", freq=freq))["value"].sum()
+            self.df = self.df.groupby(pd.Grouper(freq="H")).sum().reset_index()
+            self.df = self.df[self.df.value != 0]
+
+        if summary:
+            self.df["sum_value"] = self.df.value.cumsum() + cumsum
 
         return self.df.to_dict(orient="records")
 
@@ -98,13 +104,7 @@ class EnedisAnalytics:
         return dt_date
 
     def _get_data_interval(
-        self,
-        intervalls: list[Tuple[str, str]],
-        groupby: str | None = None,
-        freq: str = "H",
-        summary: bool = False,
-        cumsum: float = 0,
-        reverse: bool = False,
+        self, intervalls: list[Tuple[str, str]], reverse: bool = False
     ) -> pd.DataFrame:
         """Group date from range time."""
         in_df = pd.DataFrame()
@@ -123,14 +123,6 @@ class EnedisAnalytics:
 
         if reverse:
             in_df = self.df[~self.df.isin(in_df)].dropna()
-
-        if groupby:
-            in_df = in_df.groupby(pd.Grouper(key="date", freq=freq))["value"].sum()
-            in_df = in_df.groupby(pd.Grouper(freq="H")).sum().reset_index()
-            in_df = in_df[in_df.value != 0]
-
-        if summary:
-            in_df["sum_value"] = in_df.value.cumsum() + cumsum
 
         return in_df
 
@@ -154,7 +146,8 @@ class EnedisAnalytics:
         df = pd.DataFrame(data)
         if not df.empty:
             df = df.sort_values(by=orderby)
-            return df[value].iloc[-1]  # pylint: disable=unsubscriptable-object
+            if value in df.columns:
+                return df[value].iloc[-1]  # pylint: disable=unsubscriptable-object
 
 
 class EnedisByPDL:
