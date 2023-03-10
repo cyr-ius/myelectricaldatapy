@@ -109,7 +109,7 @@ async def test_empty() -> None:
     """Test empty parameters."""
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
     analytics = EnedisAnalytics([])
-    analytics.get_data_analytcis(
+    analytics.get_data_analytics(
         convertKwh=True,
         convertUTC=True,
         start_date="2000-01-01",
@@ -117,7 +117,7 @@ async def test_empty() -> None:
         groupby=True,
         summary=True,
     )
-    analytics.get_data_analytcis(
+    analytics.get_data_analytics(
         convertKwh=True,
         convertUTC=True,
         start_date="2000-01-01",
@@ -126,7 +126,7 @@ async def test_empty() -> None:
         summary=True,
     )
     analytics = EnedisAnalytics(None)  # type: ignore
-    analytics.get_data_analytcis(
+    analytics.get_data_analytics(
         convertKwh=True,
         convertUTC=True,
         start_date="2000-01-01",

@@ -19,7 +19,7 @@ async def test_hours_analytics() -> None:
     cumsum = 1000
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
     analytics = EnedisAnalytics(dataset)
-    resultat = analytics.get_data_analytcis(
+    resultat = analytics.get_data_analytics(
         convertKwh=True,
         convertUTC=False,
         intervals=intervals,
@@ -36,7 +36,7 @@ async def test_hours_analytics() -> None:
     print(resultat)
 
     analytics = EnedisAnalytics(dataset)
-    resultat = analytics.get_data_analytcis(
+    resultat = analytics.get_data_analytics(
         convertKwh=True,
         convertUTC=False,
         intervals=intervals,
@@ -51,7 +51,7 @@ async def test_hours_analytics() -> None:
     print(resultat)
 
     analytics = EnedisAnalytics(dataset)
-    resultat = analytics.get_data_analytcis(
+    resultat = analytics.get_data_analytics(
         convertKwh=True,
         convertUTC=True,
         intervals=intervals,
@@ -62,7 +62,7 @@ async def test_hours_analytics() -> None:
     print(resultat)
 
     analytics = EnedisAnalytics(dataset)
-    resultat = analytics.get_data_analytcis(
+    resultat = analytics.get_data_analytics(
         convertKwh=True,
         convertUTC=False,
         intervals=intervals,
@@ -74,7 +74,7 @@ async def test_hours_analytics() -> None:
     print(resultat)
 
     analytics = EnedisAnalytics(dataset)
-    resultat = analytics.get_data_analytcis(
+    resultat = analytics.get_data_analytics(
         convertKwh=True,
         convertUTC=False,
         intervals=intervals,
@@ -86,7 +86,7 @@ async def test_hours_analytics() -> None:
     print(resultat)
 
     analytics = EnedisAnalytics(dataset)
-    resultat = analytics.get_data_analytcis(
+    resultat = analytics.get_data_analytics(
         convertKwh=True,
         convertUTC=False,
         intervals=intervals,
@@ -108,7 +108,7 @@ async def test_daily_analytics() -> None:
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
     dataset = DS_DAILY["meter_reading"]["interval_reading"]
     analytics = EnedisAnalytics(dataset)
-    resultat = analytics.get_data_analytcis(
+    resultat = analytics.get_data_analytics(
         convertKwh=True,
         convertUTC=False,
         intervals=intervals,
@@ -128,7 +128,7 @@ async def test_compare_analytics() -> None:
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
     dataset = DS_30["meter_reading"]["interval_reading"]
     analytics = EnedisAnalytics(dataset)
-    resultat1 = analytics.get_data_analytcis(
+    resultat1 = analytics.get_data_analytics(
         convertKwh=True,
         convertUTC=False,
         intervals=intervals,
@@ -148,7 +148,7 @@ async def test_compare_analytics() -> None:
     assert sum_value == sum_value_1
     dataset = DS_COMPARE["meter_reading"]["interval_reading"]
     analytics = EnedisAnalytics(dataset)
-    resultat2 = analytics.get_data_analytcis(
+    resultat2 = analytics.get_data_analytics(
         convertKwh=True,
         convertUTC=False,
         intervals=intervals,

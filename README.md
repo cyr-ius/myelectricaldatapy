@@ -71,7 +71,7 @@ async def main():
     await api.async_refresh()
 
     # Analytics data convert
-    resultat = analytics.get_data_analytcis(
+    resultat = analytics.get_data_analytics(
         convertKwh=True,
         convertUTC=True,
         intervals=offpeak_intervals,
