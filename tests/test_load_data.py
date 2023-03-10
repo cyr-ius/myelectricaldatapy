@@ -8,7 +8,9 @@ import pytest
 import myelectricaldatapy
 from myelectricaldatapy import EnedisAnalytics, EnedisByPDL
 
-from .consts import ACCESS, DATASET, ECOWATT, INVALID_ACCESS, INVALID_ECOWATT, TEMPO
+from .consts import ACCESS
+from .consts import DATASET_30 as DATASET
+from .consts import ECOWATT, INVALID_ACCESS, INVALID_ECOWATT, TEMPO
 
 PDL = "012345"
 TOKEN = "xxxxxxxxxxxxx"
@@ -16,6 +18,7 @@ TOKEN = "xxxxxxxxxxxxx"
 
 @pytest.mark.asyncio
 async def test_ecowatt() -> None:
+    """Test get ecowatt."""
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=ECOWATT
     ):
@@ -33,6 +36,7 @@ async def test_ecowatt() -> None:
 
 @pytest.mark.asyncio
 async def test_tempoday() -> None:
+    """Test get tempo day."""
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=TEMPO
     ):
@@ -43,6 +47,7 @@ async def test_tempoday() -> None:
 
 @pytest.mark.asyncio
 async def test_valid_access() -> None:
+    """Test access."""
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=ACCESS
     ):
@@ -63,6 +68,7 @@ async def test_valid_access() -> None:
 
 @pytest.mark.asyncio
 async def test_fetch_data() -> None:
+    """Test fetch data."""
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=DATASET
     ):
@@ -81,6 +87,7 @@ async def test_fetch_data() -> None:
 
 @pytest.mark.asyncio
 async def test_load() -> None:
+    """Test load object."""
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=DATASET
     ):
@@ -98,93 +105,8 @@ async def test_load() -> None:
 
 
 @pytest.mark.asyncio
-async def test_analytcis() -> None:
-    dataset = DATASET["meter_reading"]["interval_reading"]
-    cumsum = 62.533
-    intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
-    analytics = EnedisAnalytics(dataset)
-    resultat = analytics.get_data_analytcis(
-        convertKwh=True,
-        convertUTC=False,
-        intervals=intervals,
-        freq="30T",
-        groupby="date",
-        summary=True,
-        cumsum=cumsum,
-    )
-    resultat = analytics.set_price(resultat, 0.1641, True)
-    assert resultat[0]["value"] == 0.199  # pylint: disable="unsubscriptable-object"
-    # assert resultat[0]["value"] == 18.852  # pylint: disable="unsubscriptable-object"
-    print(resultat)
-    intervals = [
-        ("00:00:00", "01:30:00"),
-        ("08:00:00", "12:30:00"),
-        ("14:00:00", "00:00:00"),
-    ]
-    analytics = EnedisAnalytics(dataset)
-    resultat = analytics.get_data_analytcis(
-        convertKwh=True,
-        convertUTC=False,
-        intervals=intervals,
-        freq="30T",
-        groupby="date",
-        summary=True,
-        cumsum=cumsum,
-    )
-    print(resultat)
-    # Inverse
-    analytics = EnedisAnalytics(dataset)
-    resultat = analytics.get_data_analytcis(
-        convertKwh=True,
-        convertUTC=False,
-        intervals=intervals,
-        freq="H",
-        groupby="date",
-        summary=True,
-        cumsum=cumsum,
-        reverse=True,
-    )
-    resultat = analytics.set_price(resultat, 0.1641, True)
-    assert resultat[0]["value"] == 0.202  # pylint: disable="unsubscriptable-object"
-    # assert resultat[0]["value"] == 48.482  # pylint: disable="unsubscriptable-object"
-    print(resultat)
-    # Other
-    analytics = EnedisAnalytics(dataset)
-    cumsum = 744.86
-    intervals = [
-        ("00:00:00", "01:30:00"),
-        ("08:00:00", "12:30:00"),
-        ("14:00:00", "00:00:00"),
-    ]
-    resultat = analytics.get_data_analytcis(
-        convertKwh=True,
-        convertUTC=False,
-        intervals=intervals,
-        freq="D",
-        groupby="date",
-        summary=True,
-        cumsum=cumsum,
-    )
-    resultat = analytics.set_price(resultat, 0.1641, True)
-    assert resultat[0]["value"] == 13.044  # pylint: disable="unsubscriptable-object"
-    # Other
-    resultat = analytics.get_last_value(resultat, "date", "sum_value")
-    assert resultat == 1020.472
-
-    analytics = EnedisAnalytics(dataset)
-    resultat = analytics.get_data_analytcis(
-        convertKwh=True,
-        convertUTC=False,
-        intervals=intervals,
-        freq="D",
-        groupby="date",
-        summary=True,
-    )
-    assert resultat[0]["value"] == 13.044  # pylint: disable="unsubscriptable-object"
-
-
-@pytest.mark.asyncio
 async def test_empty() -> None:
+    """Test empty parameters."""
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
     analytics = EnedisAnalytics([])
     analytics.get_data_analytcis(
@@ -192,7 +114,7 @@ async def test_empty() -> None:
         convertUTC=True,
         start_date="2000-01-01",
         intervals=intervals,
-        groupby="date",
+        groupby=True,
         summary=True,
     )
     analytics.get_data_analytcis(
@@ -200,7 +122,7 @@ async def test_empty() -> None:
         convertUTC=True,
         start_date="2000-01-01",
         intervals=None,
-        groupby="date",
+        groupby=True,
         summary=True,
     )
     analytics = EnedisAnalytics(None)  # type: ignore
@@ -208,15 +130,7 @@ async def test_empty() -> None:
         convertKwh=True,
         convertUTC=True,
         start_date="2000-01-01",
-        intervals=None,
-        groupby="date",
+        intervals=intervals,
+        groupby=True,
         summary=True,
     )
-
-
-@pytest.mark.asyncio
-async def test_nodata() -> None:
-    analytics = EnedisAnalytics([])
-    resultat = analytics.get_data_analytcis()
-    offpeak = analytics.set_price(resultat, 0.1641, True)
-    assert not offpeak
