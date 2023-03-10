@@ -24,17 +24,17 @@ class EnedisAnalytics:
         """Initialize Dataframe."""
         self.df = pd.DataFrame(data)
 
-    def get_data_analytcis(
+    def get_data_analytics(
         self,
         convertKwh: bool = False,
         convertUTC: bool = False,
         start_date: str | None = None,
         intervals: list[Tuple[str, str]] | None = None,
-        groupby: str | None = None,
+        groupby: bool = False,
         freq: str = "H",
         summary: bool = False,
         cumsum: float = 0,
-        reverse: bool = False,
+        prices: tuple[float, float] | None = None,
     ) -> Any:
         """Convert datas to analyze."""
         if not self.df.empty:
@@ -50,12 +50,16 @@ class EnedisAnalytics:
             # Substract 1 minute at midnight
             # because Pandas considers midnight as the next day while
             # for Enedis it is the day before
-            self.df.date = self.df.date.transform(self._midnightminus)
+            if "interval_length" in self.df:
+                self.df.date = self.df.date.transform(self._midnightminus)
 
             if start_date:
                 self.df = self.df[(self.df.date > f"{start_date} 23:59:59")]
 
             self.df.index = self.df.date
+
+            # Add mark
+            self.df["notes"] = "HP"
 
         if self.df.empty:
             return self.df.to_dict(orient="records")
@@ -74,16 +78,35 @@ class EnedisAnalytics:
         else:
             self.df.value = pd.to_numeric(self.df.value) * self.df.interval_length
 
-        if intervals and freq != "D":
-            self.df = self._get_data_interval(intervals, reverse)
+        if intervals:
+            self.df = self._get_data_interval(intervals)
 
         if groupby:
-            self.df = self.df.groupby(pd.Grouper(key="date", freq=freq))["value"].sum()
-            self.df = self.df.groupby(pd.Grouper(freq="H")).sum().reset_index()
-            self.df = self.df[self.df.value != 0]
+            self.df = (
+                self.df.groupby(["notes", pd.Grouper(key="date", freq=freq)])["value"]
+                .sum()
+                .reset_index()
+            )
+
+        if prices:
+            self.df.loc[(self.df.notes == "HP"), "price"] = self.df.value * prices[0]
+            self.df.loc[(self.df.notes == "HC"), "price"] = self.df.value * prices[1]
 
         if summary:
-            self.df["sum_value"] = self.df.value.cumsum() + cumsum
+            self.df.loc[(self.df.notes == "HP"), "sum_value"] = (
+                self.df[(self.df.notes == "HP")].value.cumsum() + cumsum
+            )
+            self.df.loc[(self.df.notes == "HC"), "sum_value"] = (
+                self.df[(self.df.notes == "HC")].value.cumsum() + cumsum
+            )
+
+        if prices and summary:
+            self.df.loc[(self.df.notes == "HP"), "sum_price"] = (
+                self.df[(self.df.notes == "HP")].price.cumsum() + 100
+            )
+            self.df.loc[(self.df.notes == "HC"), "sum_price"] = (
+                self.df[(self.df.notes == "HC")].price.cumsum() + 100
+            )
 
         return self.df.to_dict(orient="records")
 
@@ -103,11 +126,8 @@ class EnedisAnalytics:
             return dt_date
         return dt_date
 
-    def _get_data_interval(
-        self, intervalls: list[Tuple[str, str]], reverse: bool = False
-    ) -> pd.DataFrame:
+    def _get_data_interval(self, intervalls: list[Tuple[str, str]]) -> pd.DataFrame:
         """Group date from range time."""
-        in_df = pd.DataFrame()
         for intervall in intervalls:
             # Convert str to datetime
             start = pd.to_datetime(intervall[0], format="%H:%M:%S")
@@ -115,31 +135,12 @@ class EnedisAnalytics:
             # Get Time
             start = start.time()
             end = self._midnightminus(end).time()
-            # Check interval
-            df2 = self.df[
-                (self.df.date.dt.time >= start) & (self.df.date.dt.time < end)
-            ]
-            in_df = pd.concat([in_df, df2], ignore_index=True)
+            # Mark
+            self.df.loc[
+                (self.df.date.dt.time >= start) & (self.df.date.dt.time < end), "notes"
+            ] = "HC"
 
-        if reverse:
-            in_df = self.df[~self.df.isin(in_df)].dropna()
-
-        return in_df
-
-    def set_price(
-        self,
-        data: dict[str, Any],
-        price: float,
-        summary: bool = False,
-    ) -> Any:
-        """Set prince."""
-        df = pd.DataFrame(data)
-        if df.empty:
-            return df.to_dict(orient="records")
-        df["price"] = df["value"] * price
-        if summary:
-            df["sum_price"] = df["price"].cumsum()
-        return df.to_dict("records")
+        return self.df
 
     def get_last_value(self, data: dict[str, Any], orderby: str, value: str) -> Any:
         """Return last value after order by."""
