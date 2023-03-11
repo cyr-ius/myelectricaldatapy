@@ -33,10 +33,15 @@ class EnedisAnalytics:
         groupby: bool = False,
         freq: str = "H",
         summary: bool = False,
-        cumsum: float = 0,
-        prices: tuple[float, float] | None = None,
+        cumsums: Tuple[float, float] | None = None,
+        prices: Tuple[float, float] | None = None,
     ) -> Any:
         """Convert datas to analyze."""
+        cum_sum = cum_sum_price = None
+        if cumsums and len(cumsums) == 2:
+            cum_sum = cumsums[0]
+            cum_sum_price = cumsums[1]
+
         if not self.df.empty:
             # Convert str to datetime
             self.df.date = pd.to_datetime(self.df.date, format="%Y-%m-%d %H:%M:%S")
@@ -59,7 +64,7 @@ class EnedisAnalytics:
             self.df.index = self.df.date
 
             # Add mark
-            self.df["notes"] = "HP"
+            self.df["notes"] = "standard"
 
         if self.df.empty:
             return self.df.to_dict(orient="records")
@@ -89,23 +94,27 @@ class EnedisAnalytics:
             )
 
         if prices:
-            self.df.loc[(self.df.notes == "HP"), "price"] = self.df.value * prices[0]
-            self.df.loc[(self.df.notes == "HC"), "price"] = self.df.value * prices[1]
-
-        if summary:
-            self.df.loc[(self.df.notes == "HP"), "sum_value"] = (
-                self.df[(self.df.notes == "HP")].value.cumsum() + cumsum
+            self.df.loc[(self.df.notes == "standard"), "price"] = (
+                self.df.value * prices[0]
             )
-            self.df.loc[(self.df.notes == "HC"), "sum_value"] = (
-                self.df[(self.df.notes == "HC")].value.cumsum() + cumsum
+            self.df.loc[(self.df.notes == "offpeak"), "price"] = (
+                self.df.value * prices[1]
             )
 
-        if prices and summary:
-            self.df.loc[(self.df.notes == "HP"), "sum_price"] = (
-                self.df[(self.df.notes == "HP")].price.cumsum() + 100
+        if summary and cum_sum:
+            self.df.loc[(self.df.notes == "standard"), "sum_value"] = (
+                self.df[(self.df.notes == "standard")].value.cumsum() + cum_sum
             )
-            self.df.loc[(self.df.notes == "HC"), "sum_price"] = (
-                self.df[(self.df.notes == "HC")].price.cumsum() + 100
+            self.df.loc[(self.df.notes == "offpeak"), "sum_value"] = (
+                self.df[(self.df.notes == "offpeak")].value.cumsum() + cum_sum
+            )
+
+        if prices and cum_sum_price:
+            self.df.loc[(self.df.notes == "standard"), "sum_price"] = (
+                self.df[(self.df.notes == "standard")].price.cumsum() + cum_sum_price
+            )
+            self.df.loc[(self.df.notes == "offpeak"), "sum_price"] = (
+                self.df[(self.df.notes == "offpeak")].price.cumsum() + cum_sum_price
             )
 
         return self.df.to_dict(orient="records")
@@ -138,7 +147,7 @@ class EnedisAnalytics:
             # Mark
             self.df.loc[
                 (self.df.date.dt.time >= start) & (self.df.date.dt.time < end), "notes"
-            ] = "HC"
+            ] = "offpeak"
 
         return self.df
 
