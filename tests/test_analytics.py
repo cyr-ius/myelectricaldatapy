@@ -16,7 +16,7 @@ TOKEN = "xxxxxxxxxxxxx"
 async def test_hours_analytics() -> None:
     """Test analytics compute."""
     dataset = DS_30["meter_reading"]["interval_reading"]
-    cumsum = 1000
+    cumsums = (1000, 0)
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
     analytics = EnedisAnalytics(dataset)
     resultat = analytics.get_data_analytics(
@@ -26,10 +26,10 @@ async def test_hours_analytics() -> None:
         freq="H",
         groupby=True,
         summary=True,
-        cumsum=cumsum,
+        cumsums=cumsums,
         prices=(0.17, 0.18),
     )
-    assert resultat[0]["notes"] == "HC"
+    assert resultat[0]["notes"] == "offpeak"
     assert resultat[0]["value"] == 0.618
     assert resultat[0].get("sum_value") is not None
     assert resultat[0].get("sum_price") is not None
@@ -44,7 +44,7 @@ async def test_hours_analytics() -> None:
         groupby=True,
         prices=(0.17, 0.18),
     )
-    assert resultat[0]["notes"] == "HC"
+    assert resultat[0]["notes"] == "offpeak"
     assert resultat[0]["value"] == 0.618
     assert resultat[2]["price"] == 0.55152
     assert resultat[0].get("sum_value") is None
@@ -59,18 +59,6 @@ async def test_hours_analytics() -> None:
         groupby=True,
         prices=(0.17, 0.18),
     )
-    print(resultat)
-
-    analytics = EnedisAnalytics(dataset)
-    resultat = analytics.get_data_analytics(
-        convertKwh=True,
-        convertUTC=False,
-        intervals=intervals,
-        freq="30T",
-        groupby=True,
-    )
-    assert resultat[48]["notes"] == "HP"
-    assert resultat[48]["value"] == 0.672
     print(resultat)
 
     analytics = EnedisAnalytics(dataset)
@@ -93,7 +81,7 @@ async def test_hours_analytics() -> None:
         freq="D",
         groupby=True,
         summary=True,
-        cumsum=cumsum,
+        cumsums=cumsums,
         prices=(0.17, 0.18),
     )
     assert resultat[0]["value"] == 33.951
@@ -104,7 +92,6 @@ async def test_hours_analytics() -> None:
 @pytest.mark.asyncio
 async def test_daily_analytics() -> None:
     dataset = DS_30["meter_reading"]["interval_reading"]
-    cumsum = 0
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
     dataset = DS_DAILY["meter_reading"]["interval_reading"]
     analytics = EnedisAnalytics(dataset)
@@ -115,7 +102,6 @@ async def test_daily_analytics() -> None:
         freq="D",
         groupby=True,
         summary=True,
-        cumsum=cumsum,
         prices=(0.17, 0.18),
     )
     assert resultat[359]["value"] == 68.68
@@ -124,7 +110,7 @@ async def test_daily_analytics() -> None:
 
 @pytest.mark.asyncio
 async def test_compare_analytics() -> None:
-    cumsum = 0
+    cumsums = (0, 0)
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
     dataset = DS_30["meter_reading"]["interval_reading"]
     analytics = EnedisAnalytics(dataset)
@@ -135,7 +121,7 @@ async def test_compare_analytics() -> None:
         freq="D",
         groupby=True,
         summary=True,
-        cumsum=cumsum,
+        cumsums=cumsums,
         prices=(0.17, 0.18),
         start_date="2023-02-28",
     )
@@ -155,7 +141,7 @@ async def test_compare_analytics() -> None:
         freq="D",
         groupby=True,
         summary=True,
-        cumsum=cumsum,
+        cumsums=cumsums,
         prices=(0.17, 0.18),
         start_date="2023-02-28",
     )

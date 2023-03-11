@@ -33,11 +33,12 @@ class EnedisAnalytics:
         groupby: bool = False,
         freq: str = "H",
         summary: bool = False,
-        cumsums: Tuple[float, float] | None = None,
+        cumsums: Tuple[float | int, float | int] | None = None,
         prices: Tuple[float, float] | None = None,
     ) -> Any:
         """Convert datas to analyze."""
-        cum_sum = cum_sum_price = None
+        cum_sum: float | int = 0
+        cum_sum_price: float | int = 0
         if cumsums and len(cumsums) == 2:
             cum_sum = cumsums[0]
             cum_sum_price = cumsums[1]
@@ -101,15 +102,13 @@ class EnedisAnalytics:
                 self.df.value * prices[1]
             )
 
-        if summary and cum_sum:
+        if summary and prices:
             self.df.loc[(self.df.notes == "standard"), "sum_value"] = (
                 self.df[(self.df.notes == "standard")].value.cumsum() + cum_sum
             )
             self.df.loc[(self.df.notes == "offpeak"), "sum_value"] = (
                 self.df[(self.df.notes == "offpeak")].value.cumsum() + cum_sum
             )
-
-        if prices and cum_sum_price:
             self.df.loc[(self.df.notes == "standard"), "sum_price"] = (
                 self.df[(self.df.notes == "standard")].price.cumsum() + cum_sum_price
             )
