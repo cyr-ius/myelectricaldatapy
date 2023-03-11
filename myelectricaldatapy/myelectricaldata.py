@@ -37,11 +37,6 @@ class EnedisAnalytics:
         prices: list[dict[str, Any]] | None = None,
     ) -> Any:
         """Convert datas to analyze."""
-        std_cum_sum = cumsums.get("standard", {}).get("sum_value", 0)
-        std_cum_sum_price = cumsums.get("standard", {}).get("sum_price", 0)
-        off_cum_sum = cumsums.get("offpeak", {}).get("sum_value", 0)
-        off_cum_sum_price = cumsums.get("offpeak", {}).get("sum_price", 0)
-
         if not self.df.empty:
             # Convert str to datetime
             self.df.date = pd.to_datetime(self.df.date, format="%Y-%m-%d %H:%M:%S")
@@ -95,48 +90,32 @@ class EnedisAnalytics:
 
         if prices:
             for price in prices:
-                if s_date := price.get("standard", {}).get("date"):
-                    self.df.loc[
-                        (self.df.notes == "standard")
-                        & (
-                            self.df.date.dt.date
-                            == pd.to_datetime(s_date, format="%Y-%m-%d").date()
-                        ),
-                        "price",
-                    ] = self.df.value * price.get("standard", {}).get("price", 0)
-                else:
-                    self.df.loc[
-                        (self.df.notes == "standard"), "price"
-                    ] = self.df.value * price.get("standard", {}).get("price", 0)
+                for mode, item in price.items():
+                    if s_date := item.get("date"):
+                        self.df.loc[
+                            (self.df.notes == mode)
+                            & (
+                                self.df.date.dt.date
+                                == pd.to_datetime(s_date, format="%Y-%m-%d").date()
+                            ),
+                            "price",
+                        ] = self.df.value * item.get("price", 0)
+                    else:
+                        self.df.loc[
+                            (self.df.notes == mode), "price"
+                        ] = self.df.value * item.get("price", 0)
 
-                if s_date := price.get("offpeak", {}).get("date"):
-                    self.df.loc[
-                        (self.df.notes == "offpeak")
-                        & (
-                            self.df.date.dt.date
-                            == pd.to_datetime(s_date, format="%Y-%m-%d").date()
-                        ),
-                        "price",
-                    ] = self.df.value * price.get("offpeak", {}).get("price", 0)
-                else:
-                    self.df.loc[
-                        (self.df.notes == "offpeak"), "price"
-                    ] = self.df.value * price.get("offpeak", {}).get("price", 0)
+            if summary:
+                for mode, sums in cumsums.items():
+                    self.df.loc[(self.df.notes == mode), "sum_price"] = self.df[
+                        (self.df.notes == mode)
+                    ].price.cumsum() + sums.get("sum_price")
 
-        if summary and prices:
-            self.df.loc[(self.df.notes == "standard"), "sum_value"] = (
-                self.df[(self.df.notes == "standard")].value.cumsum() + std_cum_sum
-            )
-            self.df.loc[(self.df.notes == "offpeak"), "sum_value"] = (
-                self.df[(self.df.notes == "offpeak")].value.cumsum() + off_cum_sum
-            )
-            self.df.loc[(self.df.notes == "standard"), "sum_price"] = (
-                self.df[(self.df.notes == "standard")].price.cumsum()
-                + std_cum_sum_price
-            )
-            self.df.loc[(self.df.notes == "offpeak"), "sum_price"] = (
-                self.df[(self.df.notes == "offpeak")].price.cumsum() + off_cum_sum_price
-            )
+        if summary:
+            for mode, sums in cumsums.items():
+                self.df.loc[(self.df.notes == mode), "sum_value"] = self.df[
+                    (self.df.notes == mode)
+                ].value.cumsum() + sums.get("sum_value")
 
         return self.df.to_dict(orient="records")
 
