@@ -33,15 +33,14 @@ class EnedisAnalytics:
         groupby: bool = False,
         freq: str = "H",
         summary: bool = False,
-        cumsums: Tuple[float | int, float | int] | None = None,
+        cumsums: dict[str, Any] = {},
         prices: Tuple[float, float] | None = None,
     ) -> Any:
         """Convert datas to analyze."""
-        cum_sum: float | int = 0
-        cum_sum_price: float | int = 0
-        if cumsums and len(cumsums) == 2:
-            cum_sum = cumsums[0]
-            cum_sum_price = cumsums[1]
+        std_cum_sum = cumsums.get("standard", {}).get("sum_value", 0)
+        std_cum_sum_price = cumsums.get("standard", {}).get("sum_price", 0)
+        off_cum_sum = cumsums.get("offpeak", {}).get("sum_value", 0)
+        off_cum_sum_price = cumsums.get("offpeak", {}).get("sum_price", 0)
 
         if not self.df.empty:
             # Convert str to datetime
@@ -104,16 +103,17 @@ class EnedisAnalytics:
 
         if summary and prices:
             self.df.loc[(self.df.notes == "standard"), "sum_value"] = (
-                self.df[(self.df.notes == "standard")].value.cumsum() + cum_sum
+                self.df[(self.df.notes == "standard")].value.cumsum() + std_cum_sum
             )
             self.df.loc[(self.df.notes == "offpeak"), "sum_value"] = (
-                self.df[(self.df.notes == "offpeak")].value.cumsum() + cum_sum
+                self.df[(self.df.notes == "offpeak")].value.cumsum() + off_cum_sum
             )
             self.df.loc[(self.df.notes == "standard"), "sum_price"] = (
-                self.df[(self.df.notes == "standard")].price.cumsum() + cum_sum_price
+                self.df[(self.df.notes == "standard")].price.cumsum()
+                + std_cum_sum_price
             )
             self.df.loc[(self.df.notes == "offpeak"), "sum_price"] = (
-                self.df[(self.df.notes == "offpeak")].price.cumsum() + cum_sum_price
+                self.df[(self.df.notes == "offpeak")].price.cumsum() + off_cum_sum_price
             )
 
         return self.df.to_dict(orient="records")
