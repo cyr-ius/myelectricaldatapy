@@ -67,7 +67,7 @@ class EnedisAnalytics:
             self.df["notes"] = "standard"
 
         if self.df.empty:
-            return self.df.to_dict(orient="records")
+            return self.df.to_dict()
 
         if self.df.get("interval_length") is not None:
             self.df.interval_length = self.df.interval_length.transform(
