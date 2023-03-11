@@ -34,7 +34,7 @@ class EnedisAnalytics:
         freq: str = "H",
         summary: bool = False,
         cumsums: dict[str, Any] = {},
-        prices: Tuple[float, float] | None = None,
+        prices: list[dict[str, Any]] | None = None,
     ) -> Any:
         """Convert datas to analyze."""
         std_cum_sum = cumsums.get("standard", {}).get("sum_value", 0)
@@ -94,12 +94,34 @@ class EnedisAnalytics:
             )
 
         if prices:
-            self.df.loc[(self.df.notes == "standard"), "price"] = (
-                self.df.value * prices[0]
-            )
-            self.df.loc[(self.df.notes == "offpeak"), "price"] = (
-                self.df.value * prices[1]
-            )
+            for price in prices:
+                if s_date := price.get("standard", {}).get("date"):
+                    self.df.loc[
+                        (self.df.notes == "standard")
+                        & (
+                            self.df.date.dt.date
+                            == pd.to_datetime(s_date, format="%Y-%m-%d").date()
+                        ),
+                        "price",
+                    ] = self.df.value * price.get("standard", {}).get("price", 0)
+                else:
+                    self.df.loc[
+                        (self.df.notes == "standard"), "price"
+                    ] = self.df.value * price.get("standard", {}).get("price", 0)
+
+                if s_date := price.get("offpeak", {}).get("date"):
+                    self.df.loc[
+                        (self.df.notes == "offpeak")
+                        & (
+                            self.df.date.dt.date
+                            == pd.to_datetime(s_date, format="%Y-%m-%d").date()
+                        ),
+                        "price",
+                    ] = self.df.value * price.get("offpeak", {}).get("price", 0)
+                else:
+                    self.df.loc[
+                        (self.df.notes == "offpeak"), "price"
+                    ] = self.df.value * price.get("offpeak", {}).get("price", 0)
 
         if summary and prices:
             self.df.loc[(self.df.notes == "standard"), "sum_value"] = (
