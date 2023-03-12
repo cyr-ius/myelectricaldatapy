@@ -66,7 +66,7 @@ class EnedisAnalytics:
             self.df["notes"] = "standard"
 
         if self.df.empty:
-            return self.df.to_dict()
+            return self.df.to_dict(orient="records")
 
         if step_hour:
             self.df.interval_length = self.df.interval_length.transform(

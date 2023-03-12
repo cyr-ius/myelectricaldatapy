@@ -261,7 +261,7 @@ async def test_start_date_analytics() -> None:
         start_date="2023-3-7",
     )
     print(resultat)
-    assert len(resultat["value"]) == 0
+    assert len(resultat) == 0
     dataset = DS_30["meter_reading"]["interval_reading"]
     analytics = EnedisAnalytics(dataset)
     resultat = analytics.get_data_analytics(
@@ -271,4 +271,4 @@ async def test_start_date_analytics() -> None:
         start_date="2023-3-4",
     )
     print(resultat)
-    assert len(resultat["value"]) == 0
+    assert len(resultat) == 0
