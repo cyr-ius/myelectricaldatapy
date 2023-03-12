@@ -55,7 +55,10 @@ class EnedisAnalytics:
                 self.df.date = self.df.date.transform(self._midnightminus)
 
             if start_date:
-                self.df = self.df[(self.df.date > f"{start_date} 23:59:59")]
+                dt_start_date = pd.to_datetime(start_date, format="%Y-%m-%d %H:%M:%S")
+                dt_start_date = dt_start_date.tz_localize(self.local_timezone)
+                dt_start_date = self._midnightminus(dt_start_date)
+                self.df = self.df[(self.df.date > dt_start_date)]
 
             self.df.index = self.df.date
 
