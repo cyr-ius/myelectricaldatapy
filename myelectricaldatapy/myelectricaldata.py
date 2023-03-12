@@ -31,13 +31,13 @@ class EnedisAnalytics:
         start_date: str | None = None,
         intervals: list[Tuple[str, str]] | None = None,
         groupby: bool = False,
-        freq: str = "H",
         summary: bool = False,
         cumsums: dict[str, Any] = {},
         prices: dict[str, Any] | None = None,
         tempo: dict[str, str] | None = None,
     ) -> Any:
         """Convert datas to analyze."""
+        step_hour = False
         if not self.df.empty:
             # Convert str to datetime
             self.df.date = pd.to_datetime(self.df.date, format="%Y-%m-%d %H:%M:%S")
@@ -48,16 +48,16 @@ class EnedisAnalytics:
                     self.df.date, utc=True, format="%Y-%m-%d %H:%M:%S"
                 )
 
-            # Substract 1 minute at midnight
-            # because Pandas considers midnight as the next day while
-            # for Enedis it is the day before
+            # Substract 1 minute at hour
+            # because Pandas considers hour as the next hour while
+            # for Enedis it is the hour before
             if "interval_length" in self.df:
+                step_hour = True
                 self.df.date = self.df.date.transform(self._minuteminus)
 
             if start_date:
                 dt_start_date = pd.to_datetime(start_date, format="%Y-%m-%d %H:%M:%S")
                 dt_start_date = dt_start_date.tz_localize(self.local_timezone)
-                dt_start_date = self._midnightminus(dt_start_date)
                 self.df = self.df[(self.df.date > dt_start_date)]
 
             self.df.index = self.df.date
@@ -68,7 +68,7 @@ class EnedisAnalytics:
         if self.df.empty:
             return self.df.to_dict()
 
-        if self.df.get("interval_length") is not None:
+        if step_hour:
             self.df.interval_length = self.df.interval_length.transform(
                 self._weighted_interval
             )
@@ -86,6 +86,7 @@ class EnedisAnalytics:
             self._get_data_interval(intervals)
 
         if groupby:
+            freq = "H" if step_hour else "D"
             self.df = (
                 self.df.groupby(["notes", pd.Grouper(key="date", freq=freq)])["value"]
                 .sum()

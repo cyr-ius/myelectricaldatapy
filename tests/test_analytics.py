@@ -28,7 +28,6 @@ async def test_hours_analytics() -> None:
         convertKwh=True,
         convertUTC=False,
         intervals=intervals,
-        freq="H",
         groupby=True,
         summary=True,
         cumsums=cumsums,
@@ -45,7 +44,6 @@ async def test_hours_analytics() -> None:
         convertKwh=True,
         convertUTC=False,
         intervals=intervals,
-        freq="H",
         groupby=True,
         prices=prices,
     )
@@ -60,7 +58,6 @@ async def test_hours_analytics() -> None:
         convertKwh=True,
         convertUTC=True,
         intervals=intervals,
-        freq="H",
         groupby=True,
         prices=prices,
     )
@@ -71,26 +68,24 @@ async def test_hours_analytics() -> None:
         convertKwh=True,
         convertUTC=False,
         intervals=intervals,
-        freq="H",
         groupby=True,
     )
     assert resultat[27]["value"] == 1.296
     assert resultat[28]["value"] == 5.978
     print(resultat)
 
+    dataset = DS_DAILY["meter_reading"]["interval_reading"]
     analytics = EnedisAnalytics(dataset)
     resultat = analytics.get_data_analytics(
         convertKwh=True,
         convertUTC=False,
         intervals=intervals,
-        freq="D",
         groupby=True,
         summary=True,
         cumsums=cumsums,
         prices=prices,
     )
-    assert resultat[0]["value"] == 37.836
-    assert resultat[3]["value"] == 39.723
+    assert resultat[0]["value"] == 42.045
     print(resultat)
 
 
@@ -105,7 +100,6 @@ async def test_daily_analytics() -> None:
         convertKwh=True,
         convertUTC=False,
         intervals=intervals,
-        freq="D",
         groupby=True,
         summary=True,
         prices=prices,
@@ -128,19 +122,17 @@ async def test_compare_analytics() -> None:
         convertKwh=True,
         convertUTC=False,
         intervals=intervals,
-        freq="D",
         groupby=True,
         summary=True,
         cumsums=cumsums,
         prices=prices,
-        start_date="2023-02-28",
     )
     print(resultat1)
     sum_value = 0
     for rslt in resultat1:
         sum_value = sum_value + rslt["value"]
 
-    sum_value_1 = resultat1[2]["sum_value"] + resultat1[5]["sum_value"]
+    sum_value_1 = resultat1[26]["sum_value"] + resultat1[71]["sum_value"]
     assert sum_value == sum_value_1
     dataset = DS_COMPARE["meter_reading"]["interval_reading"]
     analytics = EnedisAnalytics(dataset)
@@ -148,7 +140,6 @@ async def test_compare_analytics() -> None:
         convertKwh=True,
         convertUTC=False,
         intervals=intervals,
-        freq="D",
         groupby=True,
         summary=True,
         cumsums=cumsums,
@@ -173,7 +164,6 @@ async def test_cumsums_analytics() -> None:
         convertKwh=True,
         convertUTC=False,
         intervals=intervals,
-        freq="D",
         groupby=True,
         summary=True,
         cumsums=cumsums,
@@ -184,8 +174,8 @@ async def test_cumsums_analytics() -> None:
     assert resultat[0]["sum_value"] == resultat[0]["value"] + 1000
     assert resultat[0]["sum_price"] == resultat[0]["price"] + 75
     # standard
-    assert resultat[3]["sum_value"] == resultat[3]["value"] + 100
-    assert resultat[3]["sum_price"] == resultat[3]["price"] + 50
+    assert resultat[27]["sum_value"] == resultat[27]["value"] + 100
+    assert resultat[27]["sum_price"] == resultat[27]["price"] + 50
 
 
 @pytest.mark.asyncio
@@ -206,7 +196,6 @@ async def test_tempo_analytics() -> None:
         convertKwh=True,
         convertUTC=False,
         intervals=intervals,
-        freq="D",
         groupby=True,
         summary=True,
         cumsums=cumsums,
@@ -220,7 +209,6 @@ async def test_tempo_analytics() -> None:
         convertKwh=True,
         convertUTC=False,
         intervals=intervals,
-        freq="H",
         groupby=True,
         summary=True,
         cumsums=cumsums,
@@ -238,20 +226,6 @@ async def test_tempo_analytics() -> None:
         convertKwh=True,
         convertUTC=False,
         intervals=intervals,
-        freq="D",
-        groupby=True,
-        summary=True,
-        cumsums=cumsums,
-        prices=prices,
-        start_date="2023-02-28",
-    )
-    assert resultat[0]["value"] == 37.836
-    analytics = EnedisAnalytics(dataset)
-    resultat = analytics.get_data_analytics(
-        convertKwh=True,
-        convertUTC=False,
-        intervals=intervals,
-        freq="H",
         groupby=True,
         summary=True,
         cumsums=cumsums,
@@ -259,3 +233,42 @@ async def test_tempo_analytics() -> None:
         start_date="2023-02-28",
     )
     assert resultat[0]["value"] == 1.697
+
+    prices = {"standard": {"price": 0.5}, "offpeak": {"price": 1}}
+    dataset = DS_DAILY["meter_reading"]["interval_reading"]
+    analytics = EnedisAnalytics(dataset)
+    resultat = analytics.get_data_analytics(
+        convertKwh=True,
+        convertUTC=False,
+        intervals=intervals,
+        groupby=True,
+        summary=True,
+        cumsums=cumsums,
+        prices=prices,
+        start_date="2023-02-28",
+    )
+    assert resultat[0]["price"] == resultat[0]["value"] * 0.5
+
+
+@pytest.mark.asyncio
+async def test_start_date_analytics() -> None:
+    dataset = DS_DAILY["meter_reading"]["interval_reading"]
+    analytics = EnedisAnalytics(dataset)
+    resultat = analytics.get_data_analytics(
+        convertKwh=True,
+        convertUTC=False,
+        groupby=True,
+        start_date="2023-3-7",
+    )
+    print(resultat)
+    assert len(resultat["value"]) == 0
+    dataset = DS_30["meter_reading"]["interval_reading"]
+    analytics = EnedisAnalytics(dataset)
+    resultat = analytics.get_data_analytics(
+        convertKwh=True,
+        convertUTC=False,
+        groupby=True,
+        start_date="2023-3-4",
+    )
+    print(resultat)
+    assert len(resultat["value"]) == 0
