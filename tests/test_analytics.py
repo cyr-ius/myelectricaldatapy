@@ -272,3 +272,33 @@ async def test_start_date_analytics() -> None:
     )
     print(resultat)
     assert len(resultat) == 0
+
+
+@pytest.mark.asyncio
+async def test_price_analytics() -> None:
+    dataset = DS_30["meter_reading"]["interval_reading"]
+    prices = {
+        "standard": {"blue": 0.2, "white": 0.3, "red": 3},
+        "offpeak": {"blue": 0.1, "white": 0.2, "red": 1.5},
+    }
+    analytics = EnedisAnalytics(dataset)
+    resultat = analytics.get_data_analytics(
+        convertKwh=True,
+        convertUTC=False,
+        groupby=True,
+        prices=prices,
+        tempo=None,
+    )
+    assert resultat[0].get("price") is None
+
+    dataset = DS_30["meter_reading"]["interval_reading"]
+    prices = {"standard": {"price": 0.5}, "offpeak": {"price": 1}}
+    analytics = EnedisAnalytics(dataset)
+    resultat = analytics.get_data_analytics(
+        convertKwh=True,
+        convertUTC=False,
+        groupby=True,
+        prices=prices,
+        tempo=TEMPO,
+    )
+    assert resultat[0].get("price") is None

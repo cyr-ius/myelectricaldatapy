@@ -99,15 +99,20 @@ class EnedisAnalytics:
         if prices:
             if tempo:
                 for mode, values in prices.items():
-                    for tempo, price in values.items():
-                        self.df.loc[
-                            (self.df.notes == mode) & (self.df.tempo == tempo), "price"
-                        ] = (self.df.value * price)
+                    if isinstance(values.items(), dict):
+                        for tempo, price in values.items():
+                            self.df.loc[
+                                (self.df.notes == mode) & (self.df.tempo == tempo),
+                                "price",
+                            ] = (
+                                self.df.value * price
+                            )
             else:
                 for mode, values in prices.items():
-                    self.df.loc[(self.df.notes == mode), "price"] = (
-                        self.df.value * values["price"]
-                    )
+                    if price := values.get("price"):
+                        self.df.loc[(self.df.notes == mode), "price"] = (
+                            self.df.value * price
+                        )
 
             if summary:
                 for mode, sums in cumsums.items():
