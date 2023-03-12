@@ -34,7 +34,8 @@ class EnedisAnalytics:
         freq: str = "H",
         summary: bool = False,
         cumsums: dict[str, Any] = {},
-        prices: list[dict[str, Any]] | None = None,
+        prices: dict[str, Any] | None = None,
+        tempo: dict[str, str] | None = None,
     ) -> Any:
         """Convert datas to analyze."""
         if not self.df.empty:
@@ -79,7 +80,7 @@ class EnedisAnalytics:
             self.df.value = pd.to_numeric(self.df.value) * self.df.interval_length
 
         if intervals:
-            self.df = self._get_data_interval(intervals)
+            self._get_data_interval(intervals)
 
         if groupby:
             self.df = (
@@ -88,22 +89,21 @@ class EnedisAnalytics:
                 .reset_index()
             )
 
+        if tempo:
+            self._set_tempo_days(tempo)
+
         if prices:
-            for price in prices:
-                for mode, item in price.items():
-                    if s_date := item.get("date"):
+            if tempo:
+                for mode, values in prices.items():
+                    for tempo, price in values.items():
                         self.df.loc[
-                            (self.df.notes == mode)
-                            & (
-                                self.df.date.dt.date
-                                == pd.to_datetime(s_date, format="%Y-%m-%d").date()
-                            ),
-                            "price",
-                        ] = self.df.value * item.get("price", 0)
-                    else:
-                        self.df.loc[
-                            (self.df.notes == mode), "price"
-                        ] = self.df.value * item.get("price", 0)
+                            (self.df.notes == mode) & (self.df.tempo == tempo), "price"
+                        ] = (self.df.value * price)
+            else:
+                for mode, values in prices.items():
+                    self.df.loc[(self.df.notes == mode), "price"] = (
+                        self.df.value * values["price"]
+                    )
 
             if summary:
                 for mode, sums in cumsums.items():
@@ -132,7 +132,6 @@ class EnedisAnalytics:
         """
         if dt_date.time() == dt.strptime("00:00:00", "%H:%M:%S").time():
             dt_date = dt_date - timedelta(minutes=1)
-            return dt_date
         return dt_date
 
     def _get_data_interval(self, intervalls: list[Tuple[str, str]]) -> pd.DataFrame:
@@ -151,13 +150,18 @@ class EnedisAnalytics:
 
         return self.df
 
+    def _set_tempo_days(self, tempo: dict[str, str]) -> pd.DataFrame:
+        "Add columns with tempo day."
+        for str_date, value in tempo.items():
+            dt_date = pd.to_datetime(str_date, format="%Y-%m-%d")
+            self.df.loc[(self.df.date.dt.date == dt_date.date()), "tempo"] = value
+
     def get_last_value(self, data: dict[str, Any], orderby: str, value: str) -> Any:
         """Return last value after order by."""
         df = pd.DataFrame(data)
-        if not df.empty:
+        if not df.empty and value in df.columns:
             df = df.sort_values(by=orderby)
-            if value in df.columns:
-                return df[value].iloc[-1]  # pylint: disable=unsubscriptable-object
+            return df[value].iloc[-1]  # pylint: disable=unsubscriptable-object
 
 
 class EnedisByPDL:

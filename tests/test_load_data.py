@@ -42,7 +42,7 @@ async def test_tempoday() -> None:
     ):
         api = EnedisByPDL(token=TOKEN)
         resultat = await api.async_get_ecowatt()
-        assert resultat["2023-01-22"] == "BLUE"
+        assert resultat["2023-3-1"] == "blue"
 
 
 @pytest.mark.asyncio

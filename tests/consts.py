@@ -20,7 +20,7 @@ INVALID_ACCESS = {
     "last_call": "2023-01-07T13:58:24.532501",
     "ban": False,
 }
-TEMPO = {"2023-01-22": "BLUE"}
+TEMPO = {"2023-3-1": "blue", "2023-3-2": "red", "2023-3-3": "blue"}
 INVALID_ECOWATT = {
     "detail": "Pas de données disponible entre la date du 2023-01-22 00:00:00 et 2023-01-22 00:00:00"  # noqa
 }

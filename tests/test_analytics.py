@@ -7,6 +7,7 @@ from myelectricaldatapy import EnedisAnalytics
 from .consts import DATASET_30 as DS_30
 from .consts import DATASET_DAILY as DS_DAILY
 from .consts import DATASET_DAILY_COMPARE as DS_COMPARE
+from .consts import TEMPO
 
 PDL = "012345"
 TOKEN = "xxxxxxxxxxxxx"
@@ -20,7 +21,7 @@ async def test_hours_analytics() -> None:
         "standard": {"sum_value": 1000, "sum_price": 0},
         "offpeak": {"sum_value": 1000, "sum_price": 0},
     }
-    prices = [{"standard": {"price": 0.17}, "offpeak": {"price": 0.18}}]
+    prices = {"standard": {"price": 0.17}, "offpeak": {"price": 0.18}}
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
     analytics = EnedisAnalytics(dataset)
     resultat = analytics.get_data_analytics(
@@ -95,7 +96,7 @@ async def test_hours_analytics() -> None:
 
 @pytest.mark.asyncio
 async def test_daily_analytics() -> None:
-    prices = [{"standard": {"price": 0.17}, "offpeak": {"price": 0.18}}]
+    prices = {"standard": {"price": 0.17}, "offpeak": {"price": 0.18}}
     dataset = DS_30["meter_reading"]["interval_reading"]
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
     dataset = DS_DAILY["meter_reading"]["interval_reading"]
@@ -115,7 +116,7 @@ async def test_daily_analytics() -> None:
 
 @pytest.mark.asyncio
 async def test_compare_analytics() -> None:
-    prices = [{"standard": {"price": 0.17}, "offpeak": {"price": 0.18}}]
+    prices = {"standard": {"price": 0.17}, "offpeak": {"price": 0.18}}
     cumsums = {
         "standard": {"sum_value": 0, "sum_price": 0},
         "offpeak": {"sum_value": 0, "sum_price": 0},
@@ -160,7 +161,7 @@ async def test_compare_analytics() -> None:
 
 @pytest.mark.asyncio
 async def test_cumsums_analytics() -> None:
-    prices = [{"standard": {"price": 0.17}, "offpeak": {"price": 0.18}}]
+    prices = {"standard": {"price": 0.17}, "offpeak": {"price": 0.18}}
     cumsums = {
         "standard": {"sum_value": 100, "sum_price": 50},
         "offpeak": {"sum_value": 1000, "sum_price": 75},
@@ -189,20 +190,11 @@ async def test_cumsums_analytics() -> None:
 
 @pytest.mark.asyncio
 async def test_tempo_analytics() -> None:
-    prices = [
-        {
-            "standard": {"price": 0.2, "date": "2023-03-01"},
-            "offpeak": {"price": 0.3, "date": "2023-03-01"},
-        },
-        {
-            "standard": {"price": 0.1, "date": "2023-03-02"},
-            "offpeak": {"price": 0.2, "date": "2023-03-02"},
-        },
-        {
-            "standard": {"price": 0.2, "date": "2023-03-03"},
-            "offpeak": {"price": 0.3, "date": "2023-03-03"},
-        },
-    ]
+    """Test tempo pricings."""
+    prices = {
+        "standard": {"blue": 0.2, "white": 0.3, "red": 3},
+        "offpeak": {"blue": 0.1, "white": 0.2, "red": 1.5},
+    }
     cumsums = {
         "standard": {"sum_value": 100, "sum_price": 50},
         "offpeak": {"sum_value": 1000, "sum_price": 75},
@@ -220,5 +212,21 @@ async def test_tempo_analytics() -> None:
         cumsums=cumsums,
         prices=prices,
         start_date="2023-02-28",
+        tempo=TEMPO,
     )
+    assert resultat[0]["tempo"] == "blue"
+    prices = {"standard": {"price": 0.5}, "offpeak": {"price": 1}}
+    analytics = EnedisAnalytics(dataset)
+    resultat = analytics.get_data_analytics(
+        convertKwh=True,
+        convertUTC=False,
+        intervals=intervals,
+        freq="D",
+        groupby=True,
+        summary=True,
+        cumsums=cumsums,
+        prices=prices,
+        start_date="2023-02-28",
+    )
+    assert resultat[0]["value"] == 33.951
     print(resultat)
