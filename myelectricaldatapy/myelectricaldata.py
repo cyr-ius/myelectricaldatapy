@@ -52,7 +52,7 @@ class EnedisAnalytics:
             # because Pandas considers midnight as the next day while
             # for Enedis it is the day before
             if "interval_length" in self.df:
-                self.df.date = self.df.date.transform(self._midnightminus)
+                self.df.date = self.df.date.transform(self._minuteminus)
 
             if start_date:
                 dt_start_date = pd.to_datetime(start_date, format="%Y-%m-%d %H:%M:%S")
@@ -134,6 +134,15 @@ class EnedisAnalytics:
         to avoid taking midnight on the next day
         """
         if dt_date.time() == dt.strptime("00:00:00", "%H:%M:%S").time():
+            dt_date = dt_date - timedelta(minutes=1)
+        return dt_date
+
+    def _minuteminus(self, dt_date: dt) -> dt:
+        """Subtracts one minute.
+
+        to avoid taking midnight on the next day
+        """
+        if dt_date.minute == dt.strptime("00:00:00", "%H:%M:%S").minute:
             dt_date = dt_date - timedelta(minutes=1)
         return dt_date
 

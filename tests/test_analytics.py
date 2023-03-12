@@ -35,7 +35,7 @@ async def test_hours_analytics() -> None:
         prices=prices,
     )
     assert resultat[0]["notes"] == "offpeak"
-    assert resultat[0]["value"] == 0.618
+    assert resultat[0]["value"] == 1.697
     assert resultat[0].get("sum_value") is not None
     assert resultat[0].get("sum_price") is not None
     print(resultat)
@@ -50,8 +50,8 @@ async def test_hours_analytics() -> None:
         prices=prices,
     )
     assert resultat[0]["notes"] == "offpeak"
-    assert resultat[0]["value"] == 0.618
-    assert resultat[2]["price"] == 0.55152
+    assert resultat[0]["value"] == 1.697
+    assert round(resultat[2]["price"], 3) == 0.833
     assert resultat[0].get("sum_value") is None
     print(resultat)
 
@@ -74,8 +74,8 @@ async def test_hours_analytics() -> None:
         freq="H",
         groupby=True,
     )
-    assert resultat[27]["value"] == 0.672
-    assert resultat[28]["value"] == 0.624
+    assert resultat[27]["value"] == 1.296
+    assert resultat[28]["value"] == 5.978
     print(resultat)
 
     analytics = EnedisAnalytics(dataset)
@@ -89,8 +89,8 @@ async def test_hours_analytics() -> None:
         cumsums=cumsums,
         prices=prices,
     )
-    assert resultat[0]["value"] == 33.951
-    assert resultat[3]["value"] == 43.608
+    assert resultat[0]["value"] == 37.836
+    assert resultat[3]["value"] == 39.723
     print(resultat)
 
 
@@ -155,7 +155,7 @@ async def test_compare_analytics() -> None:
         prices=prices,
         start_date="2023-02-28",
     )
-    assert sum_value == resultat2[2]["sum_value"]
+    assert round(sum_value, 3) == resultat2[2]["sum_value"]
     print(resultat2)
 
 
@@ -229,7 +229,7 @@ async def test_tempo_analytics() -> None:
         tempo=TEMPO,
     )
     assert resultat[0]["tempo"] == "blue"
-    assert resultat[0]["value"] == 0.618
+    assert resultat[0]["value"] == 1.697
     assert resultat[0]["sum_price"] == resultat[0]["price"] + 75
     assert resultat[0]["sum_value"] == resultat[0]["value"] + 1000
     prices = {"standard": {"price": 0.5}, "offpeak": {"price": 1}}
@@ -245,7 +245,7 @@ async def test_tempo_analytics() -> None:
         prices=prices,
         start_date="2023-02-28",
     )
-    assert resultat[0]["value"] == 33.951
+    assert resultat[0]["value"] == 37.836
     analytics = EnedisAnalytics(dataset)
     resultat = analytics.get_data_analytics(
         convertKwh=True,
@@ -258,4 +258,4 @@ async def test_tempo_analytics() -> None:
         prices=prices,
         start_date="2023-02-28",
     )
-    assert resultat[0]["value"] == 0.618
+    assert resultat[0]["value"] == 1.697
