@@ -215,6 +215,23 @@ async def test_tempo_analytics() -> None:
         tempo=TEMPO,
     )
     assert resultat[0]["tempo"] == "blue"
+    analytics = EnedisAnalytics(dataset)
+    resultat = analytics.get_data_analytics(
+        convertKwh=True,
+        convertUTC=False,
+        intervals=intervals,
+        freq="H",
+        groupby=True,
+        summary=True,
+        cumsums=cumsums,
+        prices=prices,
+        start_date="2023-02-28",
+        tempo=TEMPO,
+    )
+    assert resultat[0]["tempo"] == "blue"
+    assert resultat[0]["value"] == 0.618
+    assert resultat[0]["sum_price"] == resultat[0]["price"] + 75
+    assert resultat[0]["sum_value"] == resultat[0]["value"] + 1000
     prices = {"standard": {"price": 0.5}, "offpeak": {"price": 1}}
     analytics = EnedisAnalytics(dataset)
     resultat = analytics.get_data_analytics(
@@ -229,4 +246,16 @@ async def test_tempo_analytics() -> None:
         start_date="2023-02-28",
     )
     assert resultat[0]["value"] == 33.951
-    print(resultat)
+    analytics = EnedisAnalytics(dataset)
+    resultat = analytics.get_data_analytics(
+        convertKwh=True,
+        convertUTC=False,
+        intervals=intervals,
+        freq="H",
+        groupby=True,
+        summary=True,
+        cumsums=cumsums,
+        prices=prices,
+        start_date="2023-02-28",
+    )
+    assert resultat[0]["value"] == 0.618
