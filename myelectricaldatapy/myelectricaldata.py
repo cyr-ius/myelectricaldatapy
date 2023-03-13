@@ -138,15 +138,6 @@ class EnedisAnalytics:
             return int(rslt[0]) / 60
         return 1
 
-    def _minuteminus(self, dt_date: dt) -> dt:
-        """Subtracts one minute.
-
-        to avoid taking midnight on the next day
-        """
-        if dt_date.minute == dt.strptime("00:00:00", "%H:%M:%S").minute:
-            dt_date = dt_date - timedelta(minutes=1)
-        return dt_date
-
     def _get_data_interval(self, intervalls: list[Tuple[str, str]]) -> pd.DataFrame:
         """Group date from range time."""
         for intervall in intervalls:
