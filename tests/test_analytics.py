@@ -34,7 +34,7 @@ async def test_hours_analytics() -> None:
         prices=prices,
     )
     assert resultat[0]["notes"] == "offpeak"
-    assert resultat[0]["value"] == 1.697
+    assert resultat[0]["value"] == 1.079
     assert resultat[0].get("sum_value") is not None
     assert resultat[0].get("sum_price") is not None
     print(resultat)
@@ -48,7 +48,7 @@ async def test_hours_analytics() -> None:
         prices=prices,
     )
     assert resultat[0]["notes"] == "offpeak"
-    assert resultat[0]["value"] == 1.697
+    assert resultat[0]["value"] == 1.079
     assert round(resultat[2]["price"], 3) == 0.833
     assert resultat[0].get("sum_value") is None
     print(resultat)
@@ -71,7 +71,7 @@ async def test_hours_analytics() -> None:
         groupby=True,
     )
     assert resultat[27]["value"] == 1.296
-    assert resultat[28]["value"] == 5.978
+    assert resultat[28]["value"] == 0.618
     print(resultat)
 
     dataset = DS_DAILY["meter_reading"]["interval_reading"]
@@ -132,8 +132,8 @@ async def test_compare_analytics() -> None:
     for rslt in resultat1:
         sum_value = sum_value + rslt["value"]
 
-    sum_value_1 = resultat1[26]["sum_value"] + resultat1[71]["sum_value"]
-    assert sum_value == sum_value_1
+    sum_value_1 = resultat1[26]["sum_value"] + resultat1[77]["sum_value"]
+    assert round(sum_value, 3) == round(sum_value_1, 3)
     dataset = DS_COMPARE["meter_reading"]["interval_reading"]
     analytics = EnedisAnalytics(dataset)
     resultat2 = analytics.get_data_analytics(
@@ -217,9 +217,19 @@ async def test_tempo_analytics() -> None:
         tempo=TEMPO,
     )
     assert resultat[0]["tempo"] == "blue"
-    assert resultat[0]["value"] == 1.697
+    assert resultat[0]["value"] == 1.079
     assert resultat[0]["sum_price"] == resultat[0]["price"] + 75
     assert resultat[0]["sum_value"] == resultat[0]["value"] + 1000
+
+
+@pytest.mark.asyncio
+async def test_standard_analytics() -> None:
+    cumsums = {
+        "standard": {"sum_value": 100, "sum_price": 50},
+        "offpeak": {"sum_value": 1000, "sum_price": 75},
+    }
+    intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
+    dataset = DS_30["meter_reading"]["interval_reading"]
     prices = {"standard": {"price": 0.5}, "offpeak": {"price": 1}}
     analytics = EnedisAnalytics(dataset)
     resultat = analytics.get_data_analytics(
@@ -230,10 +240,8 @@ async def test_tempo_analytics() -> None:
         summary=True,
         cumsums=cumsums,
         prices=prices,
-        start_date="2023-02-28",
     )
-    assert resultat[0]["value"] == 1.697
-
+    assert resultat[0]["value"] == 1.079
     prices = {"standard": {"price": 0.5}, "offpeak": {"price": 1}}
     dataset = DS_DAILY["meter_reading"]["interval_reading"]
     analytics = EnedisAnalytics(dataset)
@@ -301,4 +309,4 @@ async def test_price_analytics() -> None:
         prices=prices,
         tempo=TEMPO,
     )
-    assert resultat[0].get("price") is None
+    assert resultat[0].get("price") is not None

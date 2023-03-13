@@ -53,7 +53,13 @@ class EnedisAnalytics:
             # for Enedis it is the hour before
             if "interval_length" in self.df:
                 step_hour = True
-                self.df.date = self.df.date.transform(self._minuteminus)
+                self.df.loc[
+                    (
+                        self.df.date.dt.minute
+                        == dt.strptime("00:00:00", "%H:%M:%S").minute
+                    ),
+                    "date",
+                ] = self.df.date - timedelta(minutes=1)
 
             if start_date:
                 dt_start_date = pd.to_datetime(start_date, format="%Y-%m-%d %H:%M:%S")
@@ -97,22 +103,20 @@ class EnedisAnalytics:
             self._set_tempo_days(tempo)
 
         if prices:
-            if tempo:
-                for mode, values in prices.items():
-                    if isinstance(values.items(), dict):
-                        for tempo, price in values.items():
+            for mode, values in prices.items():
+                if isinstance(values, dict):
+                    for offset, price in values.items():
+                        if tempo and offset in ["blue", "white", "red"]:
                             self.df.loc[
-                                (self.df.notes == mode) & (self.df.tempo == tempo),
+                                (self.df.notes == mode) & (self.df.tempo == offset),
                                 "price",
                             ] = (
                                 self.df.value * price
                             )
-            else:
-                for mode, values in prices.items():
-                    if price := values.get("price"):
-                        self.df.loc[(self.df.notes == mode), "price"] = (
-                            self.df.value * price
-                        )
+                        elif offset == "price":
+                            self.df.loc[(self.df.notes == mode), "price"] = (
+                                self.df.value * price
+                            )
 
             if summary:
                 for mode, sums in cumsums.items():
@@ -134,15 +138,6 @@ class EnedisAnalytics:
             return int(rslt[0]) / 60
         return 1
 
-    def _midnightminus(self, dt_date: dt) -> dt:
-        """Subtracts one minute.
-
-        to avoid taking midnight on the next day
-        """
-        if dt_date.time() == dt.strptime("00:00:00", "%H:%M:%S").time():
-            dt_date = dt_date - timedelta(minutes=1)
-        return dt_date
-
     def _minuteminus(self, dt_date: dt) -> dt:
         """Subtracts one minute.
 
@@ -156,14 +151,12 @@ class EnedisAnalytics:
         """Group date from range time."""
         for intervall in intervalls:
             # Convert str to datetime
-            start = pd.to_datetime(intervall[0], format="%H:%M:%S")
-            end = pd.to_datetime(intervall[1], format="%H:%M:%S")
-            # Get Time
-            start = start.time()
-            end = self._midnightminus(end).time()
+            start = pd.to_datetime(intervall[0], format="%H:%M:%S").time()
+            end = pd.to_datetime(intervall[1], format="%H:%M:%S").time()
             # Mark
             self.df.loc[
-                (self.df.date.dt.time >= start) & (self.df.date.dt.time < end), "notes"
+                (self.df.date.dt.time > start) & (self.df.date.dt.time <= end),
+                "notes",
             ] = "offpeak"
 
         return self.df
