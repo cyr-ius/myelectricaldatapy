@@ -24,7 +24,7 @@ setup(
     description="Fetch Linky data from myelectricaldata.fr",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    install_requires=[],
+    install_requires=["aiohttp>=3.8.1", "pandas==1.5.3"],
     license="GPL-3",
     include_package_data=True,
     url="https://github.com/cyr-ius/myelectricaldatapy/tree/master/myelectricaldatapy",
