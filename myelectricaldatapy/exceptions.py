@@ -9,5 +9,9 @@ class LimitReached(EnedisException):
     """Limit reached exception."""
 
 
-class GatewayException(EnedisException):
-    """Enedis gateway error."""
+class TimeoutExceededError(EnedisException):
+    """Limit reached exception."""
+
+
+class HttpRequestError(EnedisException):
+    """Http request error."""

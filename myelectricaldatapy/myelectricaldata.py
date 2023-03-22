@@ -3,9 +3,11 @@ from __future__ import annotations
 
 import logging
 import re
+from dataclasses import dataclass
 from datetime import date
 from datetime import datetime as dt
 from datetime import timedelta
+from types import TracebackType
 from typing import Any, Collection, Optional, Tuple
 
 import pandas as pd
@@ -15,6 +17,7 @@ from .auth import TIMEOUT, EnedisAuth
 _LOGGER = logging.getLogger(__name__)
 
 
+@dataclass
 class EnedisAnalytics:
     """Data analaytics."""
 
@@ -153,7 +156,7 @@ class EnedisAnalytics:
         return self.df
 
     def _set_tempo_days(self, tempo: dict[str, str]) -> pd.DataFrame:
-        "Add columns with tempo day."
+        """Add columns with tempo day."""
         for str_date, value in tempo.items():
             dt_date = pd.to_datetime(str_date, format="%Y-%m-%d")
             self.df.loc[(self.df.date.dt.date == dt_date.date()), "tempo"] = value
@@ -166,7 +169,8 @@ class EnedisAnalytics:
             return df[value].iloc[-1]  # pylint: disable=unsubscriptable-object
 
 
-class EnedisByPDL:
+@dataclass
+class Enedis:
     """Get data of pdl."""
 
     def __init__(
@@ -314,6 +318,279 @@ class EnedisByPDL:
             "daily_consumption_max_power", pdl, start, end
         )
 
-    async def async_close(self) -> None:
-        """Close session."""
+    async def __aenter__(self) -> Enedis:
+        """Asynchronous enter."""
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        """Asynchronous exit."""
+        await self.close()
+
+    async def close(self) -> None:
+        """Close the session."""
         await self.auth.async_close()
+
+
+class EnedisByPDL:
+    """PDL class."""
+
+    def __init__(
+        self,
+        pdl: str,
+        token: str,
+        session: Optional[Any] = None,
+        svc_consumption: str | None = None,
+        svc_production: str | None = None,
+        timeout: int = TIMEOUT,
+    ) -> None:
+        """Initialize."""
+        self.pdl = pdl
+        self._api: Enedis = Enedis(token, session, timeout)
+        self.svc_consumption = svc_consumption
+        self.svc_production = svc_production
+        self._tempo_subs: bool = False
+        self._off_subs: bool = False
+        self._ecowatt_subs: bool = False
+        self._maxpower_subs: bool = False
+        self._intervals: list[Tuple[str, str]] = []
+        self._access: dict[str, Any] = {}
+        self._contact: dict[str, Any] = {}
+        self._address: dict[str, Any] = {}
+        self._tempo: dict[str, Any] = {}
+        self._ecowatt: dict[str, Any] = {}
+        self._max_power: dict[str, Any] = {}
+        self._consumption: dict[str, Any] = {}
+        self._production: dict[str, Any] = {}
+        self._off_pricings: dict[str, Any] = {}
+        self._prod_pricings: dict[str, Any] = {}
+        self._consum_sum: dict[str, Any] = {}
+        self._prod_sum: dict[str, Any] = {}
+        self._connected: bool = False
+        self.start_date: str | None = None
+
+    @property
+    def is_connected(self) -> bool:
+        """Connect state."""
+        return self._access.get("valid", False) is True
+
+    @property
+    def contact(self) -> dict[str, Any]:
+        """Contact."""
+        return self._contact
+
+    @property
+    def address(self) -> dict[str, Any]:
+        """Address."""
+        return self._address
+
+    @property
+    def tempo(self) -> dict[str, Any]:
+        """Tempo."""
+        return self._tempo
+
+    @property
+    def ecowatt(self) -> dict[str, Any]:
+        """ecowatt."""
+        return self._ecowatt
+
+    @property
+    def max_power(self) -> dict[str, Any]:
+        """max_power."""
+        return self._max_power
+
+    @property
+    def tempoday(self) -> str | None:
+        """Tempo day."""
+        str_date = dt.now().strftime("%Y-%m-%d")
+        return self._tempo.get(str_date)
+
+    @property
+    def intervals(self) -> list[Tuple[str, str]]:
+        """Offpeak hours intervals."""
+        return self._intervals
+
+    @property
+    def prod_prices(self) -> dict[str, dict[str, Any]]:
+        """Production resel price."""
+        return self._prod_pricings
+
+    @property
+    def off_prices(self) -> dict[str, dict[str, Any]]:
+        """Offpeak hours prices."""
+        return self._off_pricings
+
+    @property
+    def production_stats(self) -> list[dict[str, Any]]:
+        """Production statistics."""
+        resultat = []
+        data = self._production.get("meter_reading", {}).get("interval_reading", {})
+        analytics = EnedisAnalytics(data)
+        resultat = analytics.get_data_analytics(
+            convertKwh=True,
+            convertUTC=False,
+            intervals=self.intervals,
+            groupby=True,
+            summary=True,
+            prices=self.prod_prices,
+            cumsums=self._prod_sum,
+            start_date=self.start_date,
+        )
+        return resultat
+
+    @property
+    def consumption_stats(self) -> list[dict[str, Any]]:
+        """Consumption statistics."""
+        resultat = []
+        data = self._consumption.get("meter_reading", {}).get("interval_reading", {})
+        analytics = EnedisAnalytics(data)
+        resultat = analytics.get_data_analytics(
+            convertKwh=True,
+            convertUTC=False,
+            intervals=self.intervals,
+            groupby=True,
+            summary=True,
+            prices=self.off_prices,
+            cumsums=self._consum_sum,
+            tempo=self.tempo,
+            start_date=self.start_date,
+        )
+        return resultat
+
+    async def async_update(
+        self,
+        start: dt | None = None,
+        end: dt | None = None,
+        start_date: str | None = None,
+    ) -> None:
+        """Update data."""
+        start = start if start else dt.now() - timedelta(days=730)
+        end = end if end else dt.now()
+        self.start_date = start_date
+
+        self._access = await self._api.async_valid_access(self.pdl)
+        # self._contract = await self._api.async_get_contract(self.pdl)
+        # self._address = await self._api.async_get_address(self.pdl)
+        if self._ecowatt_subs:
+            self._ecowatt = await self._api.async_get_ecowatt(start, end)
+        if self._max_power:
+            self._max_power = await self._api.async_get_max_power(self.pdl, start, end)
+
+        if self.svc_production == "daily_production":
+            start = start if start else dt.now() - timedelta(days=730)
+            self._production = await self._api.async_get_daily_production(
+                self.pdl, start, end
+            )
+        elif self.svc_production == "production_load_curve":
+            start = start if start else dt.now() - timedelta(days=7)
+            self._production = await self._api.async_get_details_production(
+                self.pdl, start, end
+            )
+
+        if self.svc_consumption == "daily_consumption":
+            start = start if start else dt.now() - timedelta(days=730)
+            self._consumption = await self._api.async_get_daily_consumption(
+                self.pdl, start, end
+            )
+        elif self.svc_consumption == "consumption_load_curve":
+            start = start if start else dt.now() - timedelta(days=7)
+            self._consumption = await self._api.async_get_details_consumption(
+                self.pdl, start, end
+            )
+            if self._tempo_subs:
+                self._tempo = await self._api.async_get_tempoday(start, end)
+
+    def tempo_subscription(self, activate: bool = False) -> None:
+        """Enable or Disable Tempo Subscription."""
+        self._off_subs = False
+        self._tempo_subs = activate is True
+
+    def offpeak_subscription(self, activate: bool = False) -> None:
+        """Enable or Disable Offpeak Hours Subscription."""
+        self._tempo_subs = False
+        self._off_subs = activate is True
+
+    def ecowatt_subscription(self, activate: bool = False) -> None:
+        """Enable or Disable Ecowatt Subscription."""
+        self._ecowatt_subs = activate is True
+
+    def maxpower_subscription(self, activate: bool = False) -> None:
+        """Enable or Disable Max power Subscription."""
+        self._maxpower_subs = activate is True
+
+    def set_intervals(self, intervals: list[Tuple[str, str]]) -> None:
+        """Set intervals."""
+        if isinstance(intervals, list):
+            self._intervals = intervals
+
+    def set_consumption_prices(
+        self,
+        price_std: int | float | None = None,
+        price_off: int | float | None = None,
+        blue: int | float | None = None,
+        blue_off: int | float | None = None,
+        white: int | float | None = None,
+        white_off: int | float | None = None,
+        red: int | float | None = None,
+        red_off: int | float | None = None,
+    ) -> None:
+        """Set intervals."""
+        original = {
+            "standard": {
+                "price": price_std,
+                "blue": blue,
+                "white": white,
+                "red": red,
+            },
+            "offpeak": {
+                "price": price_off,
+                "blue": blue_off,
+                "white": white_off,
+                "red": red_off,
+            },
+        }
+        self._off_pricings["standard"] = {
+            k: v for k, v in original["standard"].items() if v is not None
+        }
+
+        self._off_pricings["offpeak"] = {
+            k: v for k, v in original["offpeak"].items() if v is not None
+        }
+        if price_std and price_off:
+            self.offpeak_subscription(True)
+        if blue and white and red:
+            self.tempo_subscription(True)
+        print(self._off_pricings)
+
+    def set_production_prices(self, std: int | float) -> None:
+        """Set intervals."""
+        self._prod_pricings = {"standard": {"price": std}}
+
+    def set_consumption_sum(
+        self,
+        value: int | float,
+        price: int | float | None = None,
+        off_value: int | float | None = None,
+        off_price: int | float | None = None,
+    ) -> None:
+        """Set cumulative summary for consumption."""
+        original = {
+            "standard": {"sum_value": value, "sum_price": price},
+            "offpeak": {"sum_value": off_value, "sum_price": off_price},
+        }
+        self._consum_sum["standard"] = {
+            k: v for k, v in original["standard"].items() if v is not None
+        }
+
+        self._consum_sum["offpeak"] = {
+            k: v for k, v in original["offpeak"].items() if v is not None
+        }
+        print(self._consum_sum)
+
+    def set_production_sum(self, value: int | float, price: int | float) -> None:
+        """Set intervals."""
+        self._prod_sum = {"standard": {"sum_value": value, "sum_price": price}}
