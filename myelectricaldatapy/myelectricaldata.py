@@ -359,7 +359,7 @@ class EnedisByPDL:
         self._maxpower_subs: bool = False
         self._intervals: list[Tuple[str, str]] = []
         self._access: dict[str, Any] = {}
-        self._contact: dict[str, Any] = {}
+        self._contract: dict[str, Any] = {}
         self._address: dict[str, Any] = {}
         self._tempo: dict[str, Any] = {}
         self._ecowatt: dict[str, Any] = {}
@@ -381,7 +381,7 @@ class EnedisByPDL:
     @property
     def contact(self) -> dict[str, Any]:
         """Contact."""
-        return self._contact
+        return self._contract
 
     @property
     def address(self) -> dict[str, Any]:
@@ -473,8 +473,8 @@ class EnedisByPDL:
         self.start_date = start_date
 
         self._access = await self._api.async_valid_access(self.pdl)
-        # self._contract = await self._api.async_get_contract(self.pdl)
-        # self._address = await self._api.async_get_address(self.pdl)
+        self._contract = await self._api.async_get_contract(self.pdl)
+        self._address = await self._api.async_get_address(self.pdl)
         if self._ecowatt_subs:
             self._ecowatt = await self._api.async_get_ecowatt(start, end)
         if self._max_power:
