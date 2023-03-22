@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 
 import myelectricaldatapy
-from myelectricaldatapy import EnedisAnalytics, EnedisByPDL
+from myelectricaldatapy import Enedis
 
 from .consts import ACCESS
 from .consts import DATASET_30 as DATASET
@@ -22,14 +22,14 @@ async def test_ecowatt() -> None:
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=ECOWATT
     ):
-        api = EnedisByPDL(token=TOKEN)
+        api = Enedis(token=TOKEN)
         resultat = await api.async_get_ecowatt()
         assert resultat["2023-01-22"]["value"] == 1
 
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=INVALID_ECOWATT
     ):
-        api = EnedisByPDL(token=TOKEN)
+        api = Enedis(token=TOKEN)
         resultat = await api.async_get_ecowatt()
         assert resultat.get("2023-01-22") is None
 
@@ -40,7 +40,7 @@ async def test_tempoday() -> None:
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=TEMPO
     ):
-        api = EnedisByPDL(token=TOKEN)
+        api = Enedis(token=TOKEN)
         resultat = await api.async_get_ecowatt()
         assert resultat["2023-3-1"] == "blue"
 
@@ -51,7 +51,7 @@ async def test_valid_access() -> None:
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=ACCESS
     ):
-        api = EnedisByPDL(token=TOKEN)
+        api = Enedis(token=TOKEN)
         resultat = await api.async_valid_access(PDL)
         assert resultat["valid"] is True
 
@@ -61,7 +61,7 @@ async def test_valid_access() -> None:
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=INVALID_ACCESS
     ):
-        api = EnedisByPDL(token=TOKEN)
+        api = Enedis(token=TOKEN)
         resultat = await api.async_valid_access(PDL)
         assert resultat["quota_reached"] is True
 
@@ -72,7 +72,7 @@ async def test_fetch_data() -> None:
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=DATASET
     ):
-        api = EnedisByPDL(token=TOKEN)
+        api = Enedis(token=TOKEN)
         resultat = await api.async_fetch_datas(
             service="comsumption_load_curve",
             pdl=PDL,
@@ -91,7 +91,7 @@ async def test_load() -> None:
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=DATASET
     ):
-        api = EnedisByPDL(token=TOKEN)
+        api = Enedis(token=TOKEN)
         await api.async_get_max_power(PDL, dt.now(), dt.now())
         await api.async_get_contract(PDL)
         await api.async_get_address(PDL)
@@ -101,36 +101,3 @@ async def test_load() -> None:
         await api.async_get_daily_consumption(PDL, dt.now(), dt.now())
         await api.async_get_daily_production(PDL, dt.now(), dt.now())
         await api.async_get_details_production(PDL, dt.now(), dt.now())
-        await api.async_close()
-
-
-@pytest.mark.asyncio
-async def test_empty() -> None:
-    """Test empty parameters."""
-    intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
-    analytics = EnedisAnalytics([])
-    analytics.get_data_analytics(
-        convertKwh=True,
-        convertUTC=True,
-        start_date="2000-01-01",
-        intervals=intervals,
-        groupby=True,
-        summary=True,
-    )
-    analytics.get_data_analytics(
-        convertKwh=True,
-        convertUTC=True,
-        start_date="2000-01-01",
-        intervals=None,
-        groupby=True,
-        summary=True,
-    )
-    analytics = EnedisAnalytics(None)  # type: ignore
-    analytics.get_data_analytics(
-        convertKwh=True,
-        convertUTC=True,
-        start_date="2000-01-01",
-        intervals=intervals,
-        groupby=True,
-        summary=True,
-    )
