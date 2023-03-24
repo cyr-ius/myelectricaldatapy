@@ -371,6 +371,7 @@ class EnedisByPDL:
         self._consum_sum: dict[str, Any] = {}
         self._prod_sum: dict[str, Any] = {}
         self._connected: bool = False
+        self._last_access: date | None = None
         self.start_date: str | None = None
 
     @property
@@ -466,13 +467,25 @@ class EnedisByPDL:
         start: dt | None = None,
         end: dt | None = None,
         start_date: str | None = None,
+        force_refresh: bool = False,
     ) -> None:
-        """Update data."""
+        """Update data.
+
+        If the update succeeds, the next one can only be done on the next day
+        at least that force_refresh is true
+        """
+        self._access = await self._api.async_valid_access(self.pdl)
+        if (
+            self._last_access is not None
+            and self._last_access > dt.now().date()
+            and force_refresh is False
+        ):
+            return
+
         start = start if start else dt.now() - timedelta(days=730)
         end = end if end else dt.now()
         self.start_date = start_date
 
-        self._access = await self._api.async_valid_access(self.pdl)
         self._contract = await self._api.async_get_contract(self.pdl)
         self._address = await self._api.async_get_address(self.pdl)
         if self._ecowatt_subs:
@@ -503,6 +516,8 @@ class EnedisByPDL:
             )
             if self._tempo_subs:
                 self._tempo = await self._api.async_get_tempoday(start, end)
+
+        self._last_access = dt.now().date()
 
     def tempo_subscription(self, activate: bool = False) -> None:
         """Enable or Disable Tempo Subscription."""
