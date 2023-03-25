@@ -1,5 +1,4 @@
 """Tests analytics."""
-
 from __future__ import annotations
 
 from typing import Any
@@ -24,13 +23,11 @@ TOKEN = "xxxxxxxxxxxxx"
 async def test_compute() -> None:
     """Test standard."""
     dataset = DS_30
+    api = EnedisByPDL(pdl=PDL, token=TOKEN)
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
     ):
-        api = EnedisByPDL(
-            pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
-        )
-        await api.async_update()
+        await api.async_update(svc_consumption="consumption_load_curve")
         resultat = api.consumption_stats
 
     assert resultat[0]["notes"] == "standard"
@@ -40,10 +37,7 @@ async def test_compute() -> None:
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
     ):
-        api = EnedisByPDL(
-            pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
-        )
-        await api.async_update()
+        await api.async_update(svc_consumption="consumption_load_curve")
         resultat = api.consumption_stats
 
     assert resultat[0]["notes"] == "standard"
@@ -56,14 +50,12 @@ async def test_without_offpeak() -> None:
     dataset = DS_30
     prices: dict[str, Any] = {"standard": {"price": 0.17}}
     # Test standard price
+    api = EnedisByPDL(pdl=PDL, token=TOKEN)
+    api.set_prices("consumption", prices)
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
     ):
-        api = EnedisByPDL(
-            pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
-        )
-        api.set_prices("consumption", prices)
-        await api.async_update()
+        await api.async_update(svc_consumption="consumption_load_curve")
         resultat = api.consumption_stats
 
     assert resultat[0]["notes"] == "standard"
@@ -73,11 +65,7 @@ async def test_without_offpeak() -> None:
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
     ):
-        api = EnedisByPDL(
-            pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
-        )
-        api.set_prices("consumption", prices)
-        await api.async_update()
+        await api.async_update(svc_consumption="consumption_load_curve")
         resultat = api.consumption_stats
 
     assert resultat[0]["notes"] == "standard"
@@ -98,17 +86,15 @@ async def test_with_offpeak() -> None:
         "standard": {"sum_price": 0},
         "offpeak": {"sum_price": 0},
     }
+    api = EnedisByPDL(pdl=PDL, token=TOKEN)
+    api.set_intervals(intervals)
+    api.set_prices("consumption", prices)
+    api.set_cumsum_value("consumption", cumsum_value)
+    api.set_cumsum_price("consumption", cumsum_price)
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
     ):
-        api = EnedisByPDL(
-            pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
-        )
-        api.set_intervals(intervals)
-        api.set_prices("consumption", prices)
-        api.set_cumsum_value("consumption", cumsum_value)
-        api.set_cumsum_price("consumption", cumsum_price)
-        await api.async_update()
+        await api.async_update(svc_consumption="consumption_load_curve")
         resultat = api.consumption_stats
 
     assert resultat[0]["notes"] == "offpeak"
@@ -118,15 +104,13 @@ async def test_with_offpeak() -> None:
     print(resultat)
 
     # Without cums
+    api = EnedisByPDL(pdl=PDL, token=TOKEN)
+    api.set_intervals(intervals)
+    api.set_prices("consumption", prices)
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
     ):
-        api = EnedisByPDL(
-            pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
-        )
-        api.set_intervals(intervals)
-        api.set_prices("consumption", prices)
-        await api.async_update()
+        await api.async_update(svc_consumption="consumption_load_curve")
         resultat = api.consumption_stats
 
     assert resultat[0]["notes"] == "offpeak"
@@ -136,14 +120,12 @@ async def test_with_offpeak() -> None:
     print(resultat)
 
     # Whitout price
+    api = EnedisByPDL(pdl=PDL, token=TOKEN)
+    api.set_intervals(intervals)
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
     ):
-        api = EnedisByPDL(
-            pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
-        )
-        api.set_intervals(intervals)
-        await api.async_update()
+        await api.async_update(svc_consumption="consumption_load_curve")
         resultat = api.consumption_stats
     assert resultat[27]["value"] == 1.296
     assert resultat[28]["value"] == 0.618
@@ -151,17 +133,14 @@ async def test_with_offpeak() -> None:
 
     # Daily
     dataset = DS_DAILY
+    api = EnedisByPDL(pdl=PDL, token=TOKEN)
+    api.set_prices("consumption", prices)
+    api.set_cumsum_value("consumption", cumsum_value)
+    api.set_cumsum_price("consumption", cumsum_price)
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
     ):
-        api = EnedisByPDL(
-            pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
-        )
-        api.set_intervals(intervals)
-        api.set_prices("consumption", prices)
-        api.set_cumsum_value("consumption", cumsum_value)
-        api.set_cumsum_price("consumption", cumsum_price)
-        await api.async_update()
+        await api.async_update(svc_consumption="consumption_load_curve")
         resultat = api.consumption_stats
 
     assert resultat[0]["value"] == 42.045
@@ -174,15 +153,13 @@ async def test_daily_with_offpeak() -> None:
     prices: dict[str, Any] = {"standard": {"price": 0.17}, "offpeak": {"price": 0.18}}
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
     dataset = DS_DAILY
+    api = EnedisByPDL(pdl=PDL, token=TOKEN)
+    api.set_intervals(intervals)
+    api.set_prices("consumption", prices)
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
     ):
-        api = EnedisByPDL(
-            pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
-        )
-        api.set_intervals(intervals)
-        api.set_prices("consumption", prices)
-        await api.async_update()
+        await api.async_update(svc_consumption="consumption_load_curve")
         resultat = api.consumption_stats
     assert resultat[359]["value"] == 68.68
     print(resultat)
@@ -202,17 +179,16 @@ async def test_compare() -> None:
     }
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
     dataset = DS_30
+    api = EnedisByPDL(pdl=PDL, token=TOKEN)
+    api.set_intervals(intervals)
+    api.set_prices("consumption", prices)
+    api.set_cumsum_value("consumption", cumsum_value)
+    api.set_cumsum_price("consumption", cumsum_price)
+
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
     ):
-        api = EnedisByPDL(
-            pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
-        )
-        api.set_intervals(intervals)
-        api.set_prices("consumption", prices)
-        api.set_cumsum_value("consumption", cumsum_value)
-        api.set_cumsum_price("consumption", cumsum_price)
-        await api.async_update()
+        await api.async_update(svc_consumption="consumption_load_curve")
         resultat1 = api.consumption_stats
 
     print(resultat1)
@@ -226,14 +202,7 @@ async def test_compare() -> None:
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
     ):
-        api = EnedisByPDL(
-            pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
-        )
-        api.set_intervals(intervals)
-        api.set_prices("consumption", prices)
-        api.set_cumsum_value("consumption", cumsum_value)
-        api.set_cumsum_price("consumption", cumsum_price)
-        await api.async_update()
+        await api.async_update(svc_consumption="consumption_load_curve")
         resultat2 = api.consumption_stats
     assert round(sum_value, 3) == resultat2[2]["sum_value"]
     print(resultat2)
@@ -253,17 +222,15 @@ async def test_cumsums() -> None:
     }
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
     dataset = DS_30
+    api = EnedisByPDL(pdl=PDL, token=TOKEN)
+    api.set_intervals(intervals)
+    api.set_prices("consumption", prices)
+    api.set_cumsum_value("consumption", cumsum_value)
+    api.set_cumsum_price("consumption", cumsum_price)
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
     ):
-        api = EnedisByPDL(
-            pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
-        )
-        api.set_intervals(intervals)
-        api.set_prices("consumption", prices)
-        api.set_cumsum_value("consumption", cumsum_value)
-        api.set_cumsum_price("consumption", cumsum_price)
-        await api.async_update()
+        await api.async_update(svc_consumption="consumption_load_curve")
         resultat = api.consumption_stats
     # offpeak
     assert resultat[0]["sum_value"] == resultat[0]["value"] + 1000
@@ -298,19 +265,17 @@ async def test_tempo() -> None:
     }
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
     dataset = DS_30
+    api = EnedisByPDL(pdl=PDL, token=TOKEN)
+    api.set_intervals(intervals)
+    api.set_prices("consumption", prices)
+    api.set_cumsum_value("consumption", cumsum_value)
+    api.set_cumsum_price("consumption", cumsum_price)
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
     ), patch.object(
         myelectricaldatapy.Enedis, "async_get_tempoday", return_value=TEMPO
     ):
-        api = EnedisByPDL(
-            pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
-        )
-        api.set_intervals(intervals)
-        api.set_prices("consumption", prices)
-        api.set_cumsum_value("consumption", cumsum_value)
-        api.set_cumsum_price("consumption", cumsum_price)
-        await api.async_update()
+        await api.async_update(svc_consumption="consumption_load_curve")
         resultat = api.consumption_stats
 
     assert resultat[0]["tempo"] == "blue"
@@ -333,18 +298,15 @@ async def test_standard_offpeak_cumsum() -> None:
         "standard": {"sum_price": 50},
         "offpeak": {"sum_price": 75},
     }
-
+    api = EnedisByPDL(pdl=PDL, token=TOKEN)
+    api.set_intervals(intervals)
+    api.set_prices("consumption", prices)
+    api.set_cumsum_value("consumption", cumsum_value)
+    api.set_cumsum_price("consumption", cumsum_price)
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
     ):
-        api = EnedisByPDL(
-            pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
-        )
-        api.set_intervals(intervals)
-        api.set_prices("consumption", prices)
-        api.set_cumsum_value("consumption", cumsum_value)
-        api.set_cumsum_price("consumption", cumsum_price)
-        await api.async_update()
+        await api.async_update(svc_consumption="consumption_load_curve")
         resultat = api.consumption_stats
 
     assert resultat[0]["value"] == 1.079
@@ -354,14 +316,7 @@ async def test_standard_offpeak_cumsum() -> None:
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
     ):
-        api = EnedisByPDL(
-            pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
-        )
-        api.set_intervals(intervals)
-        api.set_prices("consumption", prices)
-        api.set_cumsum_value("consumption", cumsum_value)
-        api.set_cumsum_price("consumption", cumsum_price)
-        await api.async_update()
+        await api.async_update(svc_consumption="consumption_load_curve")
         resultat = api.consumption_stats
 
     assert resultat[0]["price"] == resultat[0]["value"] * 0.5
@@ -371,15 +326,15 @@ async def test_standard_offpeak_cumsum() -> None:
 async def test_start_date() -> None:
     """Test with start_date."""
     dataset = DS_DAILY
+    api = EnedisByPDL(pdl=PDL, token=TOKEN)
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
     ), patch.object(
         myelectricaldatapy.Enedis, "async_valid_access", return_value=ACCESS
     ):
-        api = EnedisByPDL(
-            pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
+        await api.async_update(
+            start_date="2023-3-7", svc_consumption="consumption_load_curve"
         )
-        await api.async_update(start_date="2023-3-7")
         resultat = api.consumption_stats
 
     print(resultat)
@@ -389,10 +344,9 @@ async def test_start_date() -> None:
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
     ):
-        api = EnedisByPDL(
-            pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
+        await api.async_update(
+            start_date="2023-3-4", svc_consumption="consumption_load_curve"
         )
-        await api.async_update(start_date="2023-3-4")
         resultat = api.consumption_stats
 
     print(resultat)

@@ -16,6 +16,9 @@ from .auth import TIMEOUT, EnedisAuth
 
 _LOGGER = logging.getLogger(__name__)
 
+CONSUMPTION = "consumption"
+PRODUCTION = "production"
+
 
 @dataclass
 class EnedisAnalytics:
@@ -345,15 +348,11 @@ class EnedisByPDL:
         pdl: str,
         token: str,
         session: Optional[Any] = None,
-        svc_consumption: str | None = None,
-        svc_production: str | None = None,
         timeout: int = TIMEOUT,
     ) -> None:
         """Initialize."""
         self.pdl = pdl
         self._api: Enedis = Enedis(token, session, timeout)
-        self.svc_consumption = svc_consumption
-        self.svc_production = svc_production
         self._tempo_subs: bool = False
         self._off_subs: bool = False
         self._ecowatt_subs: bool = False
@@ -365,15 +364,11 @@ class EnedisByPDL:
         self._tempo: dict[str, Any] = {}
         self._ecowatt: dict[str, Any] = {}
         self._max_power: dict[str, Any] = {}
-
         self._consumption: dict[str, Any] = {}
         self._production: dict[str, Any] = {}
-
         self._pricings: dict[str, Any] = {}
-
         self._sum: dict[str, Any] = {}
         self._sum_price: dict[str, Any] = {}
-
         self._connected: bool = False
         self._last_access: date | None = None
         self.start_date: str | None = None
@@ -422,12 +417,22 @@ class EnedisByPDL:
     @property
     def prod_prices(self) -> dict[str, dict[str, Any]]:
         """Production resel price."""
-        return self._pricings.get("production", {})
+        return self._pricings.get(PRODUCTION, {})
 
     @property
     def consum_prices(self) -> dict[str, dict[str, Any]]:
         """Offpeak hours prices."""
-        return self._pricings.get("consumption", {})
+        return self._pricings.get(CONSUMPTION, {})
+
+    @property
+    def stats(self) -> dict[str, Any]:
+        """Statistics."""
+        stats = {}
+        if self.consumption_stats:
+            stats.update({CONSUMPTION: self.consumption_stats})
+        if self.production_stats:
+            stats.update({PRODUCTION: self.production_stats})
+        return stats
 
     @property
     def production_stats(self) -> list[dict[str, Any]]:
@@ -442,8 +447,8 @@ class EnedisByPDL:
             groupby=True,
             summary=True,
             prices=self.prod_prices,
-            cum_value=self._sum.get("production", {}),
-            cum_price=self._sum_price.get("production", {}),
+            cum_value=self._sum.get(PRODUCTION, {}),
+            cum_price=self._sum_price.get(PRODUCTION, {}),
             start_date=self.start_date,
         )
         return resultat
@@ -461,8 +466,8 @@ class EnedisByPDL:
             groupby=True,
             summary=True,
             prices=self.consum_prices,
-            cum_value=self._sum.get("consumption", {}),
-            cum_price=self._sum_price.get("consumption", {}),
+            cum_value=self._sum.get(CONSUMPTION, {}),
+            cum_price=self._sum_price.get(CONSUMPTION, {}),
             tempo=self.tempo,
             start_date=self.start_date,
         )
@@ -474,6 +479,8 @@ class EnedisByPDL:
         end: dt | None = None,
         start_date: str | None = None,
         force_refresh: bool = False,
+        svc_production: str | None = None,
+        svc_consumption: str | None = None,
     ) -> None:
         """Update data.
 
@@ -488,40 +495,45 @@ class EnedisByPDL:
         ):
             return
 
-        start = start if start else dt.now() - timedelta(days=730)
         end = end if end else dt.now()
         self.start_date = start_date
 
         self._contract = await self._api.async_get_contract(self.pdl)
         self._address = await self._api.async_get_address(self.pdl)
+
         if self._ecowatt_subs:
-            self._ecowatt = await self._api.async_get_ecowatt(start, end)
+            start_eco = start if start else dt.now() - timedelta(days=730)
+            self._ecowatt = await self._api.async_get_ecowatt(start_eco, end)
+
         if self._max_power:
-            self._max_power = await self._api.async_get_max_power(self.pdl, start, end)
+            start_max = start if start else dt.now() - timedelta(days=730)
+            self._max_power = await self._api.async_get_max_power(
+                self.pdl, start_max, end
+            )
 
-        if self.svc_production == "daily_production":
-            start = start if start else dt.now() - timedelta(days=730)
+        if svc_production == "daily_production":
+            start_prod = start if start else dt.now() - timedelta(days=730)
             self._production = await self._api.async_get_daily_production(
-                self.pdl, start, end
+                self.pdl, start_prod, end
             )
-        elif self.svc_production == "production_load_curve":
-            start = start if start else dt.now() - timedelta(days=7)
+        elif svc_production == "production_load_curve":
+            start_prod = start if start else dt.now() - timedelta(days=7)
             self._production = await self._api.async_get_details_production(
-                self.pdl, start, end
+                self.pdl, start_prod, end
             )
 
-        if self.svc_consumption == "daily_consumption":
-            start = start if start else dt.now() - timedelta(days=730)
+        if svc_consumption == "daily_consumption":
+            start_consum = start if start else dt.now() - timedelta(days=730)
             self._consumption = await self._api.async_get_daily_consumption(
-                self.pdl, start, end
+                self.pdl, start_consum, end
             )
-        elif self.svc_consumption == "consumption_load_curve":
-            start = start if start else dt.now() - timedelta(days=7)
+        elif svc_consumption == "consumption_load_curve":
+            start_consum = start if start else dt.now() - timedelta(days=7)
             self._consumption = await self._api.async_get_details_consumption(
-                self.pdl, start, end
+                self.pdl, start_consum, end
             )
             if self._tempo_subs:
-                self._tempo = await self._api.async_get_tempoday(start, end)
+                self._tempo = await self._api.async_get_tempoday(start_consum, end)
 
         self._last_access = dt.now().date()
 
