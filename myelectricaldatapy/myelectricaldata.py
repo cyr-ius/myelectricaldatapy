@@ -551,60 +551,38 @@ class EnedisByPDL:
     def set_prices(
         self,
         mode: str,
-        price_std: int | float | None = None,
-        price_off: int | float | None = None,
-        blue: int | float | None = None,
-        blue_off: int | float | None = None,
-        white: int | float | None = None,
-        white_off: int | float | None = None,
-        red: int | float | None = None,
-        red_off: int | float | None = None,
+        prices: dict[str, Any],
     ) -> None:
         """Set intervals."""
-        original = {
-            "standard": {
-                "price": price_std,
-                "blue": blue,
-                "white": white,
-                "red": red,
-            },
-            "offpeak": {
-                "price": price_off,
-                "blue": blue_off,
-                "white": white_off,
-                "red": red_off,
-            },
-        }
-        original["standard"] = {
-            k: v for k, v in original["standard"].items() if v is not None
-        }
+        pricings = {}
+        if std := prices.get("standard"):
+            pricings["standard"] = {k: v for k, v in std.items() if v is not None}
+        if off := prices.get("offpeak"):
+            pricings["offpeak"] = {k: v for k, v in off.items() if v is not None}
 
-        original["offpeak"] = {
-            k: v for k, v in original["offpeak"].items() if v is not None
-        }
-        if price_std and price_off:
+        if off and "blue" not in off:
             self.offpeak_subscription(True)
-        if blue and white and red:
+        if off and "blue" in off:
             self.tempo_subscription(True)
 
-        self._pricings.update({mode: original})
+        self._pricings.update({mode: prices})
 
-    def set_cumsum_value(
-        self, mode: str, value: int | float, off_value: int | float | None = None
-    ) -> None:
+    def set_cumsum_value(self, mode: str, cum_value: dict[str, Any]) -> None:
         """Set cumulative summary for consumption."""
-        original = {"standard": {"sum_value": value}}
-        if off_value is not None:
-            original.update({"offpeak": {"sum_value": off_value}})
+        cumsums = {}
+        if std := cum_value.get("standard"):
+            cumsums["standard"] = {k: v for k, v in std.items() if v is not None}
+        if off := cum_value.get("offpeak"):
+            cumsums["offpeak"] = {k: v for k, v in off.items() if v is not None}
 
-        self._sum.update({mode: original})
+        self._sum.update({mode: cumsums})
 
-    def set_cumsum_price(
-        self, mode: str, price: int | float, off_price: int | float | None = None
-    ) -> None:
+    def set_cumsum_price(self, mode: str, cum_price: dict[str, Any]) -> None:
         """Set cumulative summary for consumption."""
-        original = {"standard": {"sum_price": price}}
-        if off_price is not None:
-            original.update({"offpeak": {"sum_price": off_price}})
+        cumsums = {}
+        if std := cum_price.get("standard"):
+            cumsums["standard"] = {k: v for k, v in std.items() if v is not None}
+        if off := cum_price.get("offpeak"):
+            cumsums["offpeak"] = {k: v for k, v in off.items() if v is not None}
 
-        self._sum_price.update({mode: original})
+        self._sum_price.update({mode: cumsums})

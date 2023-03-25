@@ -1,3 +1,5 @@
+"""Tests analytics."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -52,7 +54,7 @@ async def test_compute() -> None:
 async def test_without_offpeak() -> None:
     """Test without offpeak , with price."""
     dataset = DS_30
-    prices: dict[str, Any] = {"mode": "consumption", "price_std": 0.17}
+    prices: dict[str, Any] = {"standard": {"price": 0.17}}
     # Test standard price
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
@@ -60,7 +62,7 @@ async def test_without_offpeak() -> None:
         api = EnedisByPDL(
             pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
         )
-        api.set_prices(**prices)
+        api.set_prices("consumption", prices)
         await api.async_update()
         resultat = api.consumption_stats
 
@@ -74,7 +76,7 @@ async def test_without_offpeak() -> None:
         api = EnedisByPDL(
             pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
         )
-        api.set_prices(**prices)
+        api.set_prices("consumption", prices)
         await api.async_update()
         resultat = api.consumption_stats
 
@@ -87,17 +89,15 @@ async def test_with_offpeak() -> None:
     """Test without offpeak , with price."""
     dataset = DS_30
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
-    prices: dict[str, Any] = {
-        "mode": "consumption",
-        "price_std": 0.17,
-        "price_off": 0.18,
-    }
+    prices: dict[str, Any] = {"standard": {"price": 0.17}, "offpeak": {"price": 0.18}}
     cumsum_value: dict[str, Any] = {
-        "mode": "consumption",
-        "value": 1000,
-        "off_value": 1000,
+        "standard": {"sum_value": 1000},
+        "offpeak": {"sum_value": 1000},
     }
-    cumsum_price: dict[str, Any] = {"mode": "consumption", "price": 0, "off_price": 0}
+    cumsum_price: dict[str, Any] = {
+        "standard": {"sum_price": 0},
+        "offpeak": {"sum_price": 0},
+    }
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
     ):
@@ -105,9 +105,9 @@ async def test_with_offpeak() -> None:
             pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
         )
         api.set_intervals(intervals)
-        api.set_prices(**prices)
-        api.set_cumsum_value(**cumsum_value)
-        api.set_cumsum_price(**cumsum_price)
+        api.set_prices("consumption", prices)
+        api.set_cumsum_value("consumption", cumsum_value)
+        api.set_cumsum_price("consumption", cumsum_price)
         await api.async_update()
         resultat = api.consumption_stats
 
@@ -125,7 +125,7 @@ async def test_with_offpeak() -> None:
             pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
         )
         api.set_intervals(intervals)
-        api.set_prices(**prices)
+        api.set_prices("consumption", prices)
         await api.async_update()
         resultat = api.consumption_stats
 
@@ -158,9 +158,9 @@ async def test_with_offpeak() -> None:
             pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
         )
         api.set_intervals(intervals)
-        api.set_prices(**prices)
-        api.set_cumsum_value(**cumsum_value)
-        api.set_cumsum_price(**cumsum_price)
+        api.set_prices("consumption", prices)
+        api.set_cumsum_value("consumption", cumsum_value)
+        api.set_cumsum_price("consumption", cumsum_price)
         await api.async_update()
         resultat = api.consumption_stats
 
@@ -169,12 +169,9 @@ async def test_with_offpeak() -> None:
 
 
 @pytest.mark.asyncio
-async def test_daily_with_offpeak_analytics() -> None:
-    prices: dict[str, Any] = {
-        "mode": "consumption",
-        "price_std": 0.17,
-        "price_off": 0.18,
-    }
+async def test_daily_with_offpeak() -> None:
+    """Test daily with offpeak."""
+    prices: dict[str, Any] = {"standard": {"price": 0.17}, "offpeak": {"price": 0.18}}
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
     dataset = DS_DAILY
     with patch.object(
@@ -184,7 +181,7 @@ async def test_daily_with_offpeak_analytics() -> None:
             pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
         )
         api.set_intervals(intervals)
-        api.set_prices(**prices)
+        api.set_prices("consumption", prices)
         await api.async_update()
         resultat = api.consumption_stats
     assert resultat[359]["value"] == 68.68
@@ -193,13 +190,16 @@ async def test_daily_with_offpeak_analytics() -> None:
 
 @pytest.mark.asyncio
 async def test_compare() -> None:
-    prices: dict[str, Any] = {
-        "mode": "consumption",
-        "price_std": 0.17,
-        "price_off": 0.18,
+    """Test details compare."""
+    prices: dict[str, Any] = {"standard": {"price": 0.17}, "offpeak": {"price": 0.18}}
+    cumsum_value: dict[str, Any] = {
+        "standard": {"sum_value": 0},
+        "offpeak": {"sum_value": 0},
     }
-    cumsum_value: dict[str, Any] = {"mode": "consumption", "value": 0, "off_value": 0}
-    cumsum_price: dict[str, Any] = {"mode": "consumption", "price": 0, "off_price": 0}
+    cumsum_price: dict[str, Any] = {
+        "standard": {"sum_price": 0},
+        "offpeak": {"sum_price": 0},
+    }
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
     dataset = DS_30
     with patch.object(
@@ -209,9 +209,9 @@ async def test_compare() -> None:
             pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
         )
         api.set_intervals(intervals)
-        api.set_prices(**prices)
-        api.set_cumsum_value(**cumsum_value)
-        api.set_cumsum_price(**cumsum_price)
+        api.set_prices("consumption", prices)
+        api.set_cumsum_value("consumption", cumsum_value)
+        api.set_cumsum_price("consumption", cumsum_price)
         await api.async_update()
         resultat1 = api.consumption_stats
 
@@ -230,9 +230,9 @@ async def test_compare() -> None:
             pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
         )
         api.set_intervals(intervals)
-        api.set_prices(**prices)
-        api.set_cumsum_value(**cumsum_value)
-        api.set_cumsum_price(**cumsum_price)
+        api.set_prices("consumption", prices)
+        api.set_cumsum_value("consumption", cumsum_value)
+        api.set_cumsum_price("consumption", cumsum_price)
         await api.async_update()
         resultat2 = api.consumption_stats
     assert round(sum_value, 3) == resultat2[2]["sum_value"]
@@ -241,17 +241,16 @@ async def test_compare() -> None:
 
 @pytest.mark.asyncio
 async def test_cumsums() -> None:
-    prices: dict[str, Any] = {
-        "mode": "consumption",
-        "price_std": 0.17,
-        "price_off": 0.18,
-    }
+    """Test cummulative summary."""
+    prices: dict[str, Any] = {"standard": {"price": 0.17}, "offpeak": {"price": 0.18}}
     cumsum_value: dict[str, Any] = {
-        "mode": "consumption",
-        "value": 100,
-        "off_value": 1000,
+        "standard": {"sum_value": 100},
+        "offpeak": {"sum_value": 1000},
     }
-    cumsum_price: dict[str, Any] = {"mode": "consumption", "price": 50, "off_price": 75}
+    cumsum_price: dict[str, Any] = {
+        "standard": {"sum_price": 50},
+        "offpeak": {"sum_price": 75},
+    }
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
     dataset = DS_30
     with patch.object(
@@ -261,9 +260,9 @@ async def test_cumsums() -> None:
             pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
         )
         api.set_intervals(intervals)
-        api.set_prices(**prices)
-        api.set_cumsum_value(**cumsum_value)
-        api.set_cumsum_price(**cumsum_price)
+        api.set_prices("consumption", prices)
+        api.set_cumsum_value("consumption", cumsum_value)
+        api.set_cumsum_price("consumption", cumsum_price)
         await api.async_update()
         resultat = api.consumption_stats
     # offpeak
@@ -278,20 +277,25 @@ async def test_cumsums() -> None:
 async def test_tempo() -> None:
     """Test tempo pricings."""
     prices: dict[str, Any] = {
-        "mode": "consumption",
-        "blue": 0.2,
-        "white": 0.3,
-        "red": 3,
-        "blue_off": 0.1,
-        "white_off": 0.2,
-        "red_off": 1.5,
+        "standard": {
+            "blue": 0.2,
+            "white": 0.3,
+            "red": 3,
+        },
+        "offpeak": {
+            "blue": 0.1,
+            "white": 0.2,
+            "red": 1.5,
+        },
     }
     cumsum_value: dict[str, Any] = {
-        "mode": "consumption",
-        "value": 100,
-        "off_value": 1000,
+        "standard": {"sum_value": 100},
+        "offpeak": {"sum_value": 1000},
     }
-    cumsum_price: dict[str, Any] = {"mode": "consumption", "price": 50, "off_price": 75}
+    cumsum_price: dict[str, Any] = {
+        "standard": {"sum_price": 50},
+        "offpeak": {"sum_price": 75},
+    }
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
     dataset = DS_30
     with patch.object(
@@ -303,9 +307,9 @@ async def test_tempo() -> None:
             pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
         )
         api.set_intervals(intervals)
-        api.set_prices(**prices)
-        api.set_cumsum_value(**cumsum_value)
-        api.set_cumsum_price(**cumsum_price)
+        api.set_prices("consumption", prices)
+        api.set_cumsum_value("consumption", cumsum_value)
+        api.set_cumsum_price("consumption", cumsum_price)
         await api.async_update()
         resultat = api.consumption_stats
 
@@ -318,18 +322,16 @@ async def test_tempo() -> None:
 @pytest.mark.asyncio
 async def test_standard_offpeak_cumsum() -> None:
     """Test with offpeak and cumsum."""
+    prices: dict[str, Any] = {"standard": {"price": 0.5}, "offpeak": {"price": 1}}
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
     dataset = DS_30
-    prices: dict[str, Any] = {"mode": "consumption", "price_std": 0.5, "price_off": 1}
     cumsum_value: dict[str, Any] = {
-        "mode": "consumption",
-        "value": 100,
-        "off_value": 50,
+        "standard": {"sum_value": 100},
+        "offpeak": {"sum_value": 1000},
     }
     cumsum_price: dict[str, Any] = {
-        "mode": "consumption",
-        "price": 1000,
-        "off_price": 75,
+        "standard": {"sum_price": 50},
+        "offpeak": {"sum_price": 75},
     }
 
     with patch.object(
@@ -339,9 +341,9 @@ async def test_standard_offpeak_cumsum() -> None:
             pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
         )
         api.set_intervals(intervals)
-        api.set_prices(**prices)
-        api.set_cumsum_value(**cumsum_value)
-        api.set_cumsum_price(**cumsum_price)
+        api.set_prices("consumption", prices)
+        api.set_cumsum_value("consumption", cumsum_value)
+        api.set_cumsum_price("consumption", cumsum_price)
         await api.async_update()
         resultat = api.consumption_stats
 
@@ -356,9 +358,9 @@ async def test_standard_offpeak_cumsum() -> None:
             pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
         )
         api.set_intervals(intervals)
-        api.set_prices(**prices)
-        api.set_cumsum_value(**cumsum_value)
-        api.set_cumsum_price(**cumsum_price)
+        api.set_prices("consumption", prices)
+        api.set_cumsum_value("consumption", cumsum_value)
+        api.set_cumsum_price("consumption", cumsum_price)
         await api.async_update()
         resultat = api.consumption_stats
 
