@@ -371,7 +371,8 @@ class EnedisByPDL:
         self._sum_price: dict[str, Any] = {}
         self._connected: bool = False
         self._last_access: date | None = None
-        self.start_date: str | None = None
+        self._date_production: str | None = None
+        self._date_consumption: str | None = None
 
     @property
     def is_connected(self) -> bool:
@@ -449,7 +450,7 @@ class EnedisByPDL:
             prices=self.prod_prices,
             cum_value=self._sum.get(PRODUCTION, {}),
             cum_price=self._sum_price.get(PRODUCTION, {}),
-            start_date=self.start_date,
+            start_date=self._date_production,
         )
         return resultat
 
@@ -469,7 +470,7 @@ class EnedisByPDL:
             cum_value=self._sum.get(CONSUMPTION, {}),
             cum_price=self._sum_price.get(CONSUMPTION, {}),
             tempo=self.tempo,
-            start_date=self.start_date,
+            start_date=self._date_consumption,
         )
         return resultat
 
@@ -477,10 +478,11 @@ class EnedisByPDL:
         self,
         start: dt | None = None,
         end: dt | None = None,
-        start_date: str | None = None,
-        force_refresh: bool = False,
         svc_production: str | None = None,
+        date_production: str | None = None,
         svc_consumption: str | None = None,
+        date_consumption: str | None = None,
+        force_refresh: bool = False,
     ) -> None:
         """Update data.
 
@@ -496,7 +498,8 @@ class EnedisByPDL:
             return
 
         end = end if end else dt.now()
-        self.start_date = start_date
+        self._date_production = date_production
+        self._date_consumption = date_consumption
 
         self._contract = await self._api.async_get_contract(self.pdl)
         self._address = await self._api.async_get_address(self.pdl)

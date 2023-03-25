@@ -333,7 +333,8 @@ async def test_start_date() -> None:
         myelectricaldatapy.Enedis, "async_valid_access", return_value=ACCESS
     ):
         await api.async_update(
-            start_date="2023-3-7", svc_consumption="consumption_load_curve"
+            date_consumption="2023-3-7",
+            svc_consumption="consumption_load_curve",
         )
         resultat = api.consumption_stats
 
@@ -345,7 +346,8 @@ async def test_start_date() -> None:
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
     ):
         await api.async_update(
-            start_date="2023-3-4", svc_consumption="consumption_load_curve"
+            date_consumption="2023-3-4",
+            svc_consumption="consumption_load_curve",
         )
         resultat = api.consumption_stats
 
