@@ -384,7 +384,7 @@ class EnedisByPDL:
         return self._access.get("valid", False) is True
 
     @property
-    def contact(self) -> dict[str, Any]:
+    def contract(self) -> dict[str, Any]:
         """Contact."""
         return self._contract
 
