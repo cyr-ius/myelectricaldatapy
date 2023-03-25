@@ -35,7 +35,8 @@ class EnedisAnalytics:
         intervals: list[Tuple[str, str]] | None = None,
         groupby: bool = False,
         summary: bool = False,
-        cumsums: dict[str, Any] = {},
+        cum_value: dict[str, Any] = {},
+        cum_price: dict[str, Any] = {},
         prices: dict[str, Any] | None = None,
         tempo: dict[str, str] | None = None,
     ) -> Any:
@@ -122,13 +123,13 @@ class EnedisAnalytics:
                             )
 
             if summary:
-                for mode, sums in cumsums.items():
+                for mode, sums in cum_price.items():
                     self.df.loc[(self.df.notes == mode), "sum_price"] = self.df[
                         (self.df.notes == mode)
                     ].price.cumsum() + sums.get("sum_price")
 
         if summary:
-            for mode, sums in cumsums.items():
+            for mode, sums in cum_value.items():
                 self.df.loc[(self.df.notes == mode), "sum_value"] = self.df[
                     (self.df.notes == mode)
                 ].value.cumsum() + sums.get("sum_value")
@@ -364,12 +365,15 @@ class EnedisByPDL:
         self._tempo: dict[str, Any] = {}
         self._ecowatt: dict[str, Any] = {}
         self._max_power: dict[str, Any] = {}
+
         self._consumption: dict[str, Any] = {}
         self._production: dict[str, Any] = {}
-        self._off_pricings: dict[str, Any] = {}
-        self._prod_pricings: dict[str, Any] = {}
-        self._consum_sum: dict[str, Any] = {}
-        self._prod_sum: dict[str, Any] = {}
+
+        self._pricings: dict[str, Any] = {}
+
+        self._sum: dict[str, Any] = {}
+        self._sum_price: dict[str, Any] = {}
+
         self._connected: bool = False
         self._last_access: date | None = None
         self.start_date: str | None = None
@@ -418,12 +422,12 @@ class EnedisByPDL:
     @property
     def prod_prices(self) -> dict[str, dict[str, Any]]:
         """Production resel price."""
-        return self._prod_pricings
+        return self._pricings.get("production", {})
 
     @property
-    def off_prices(self) -> dict[str, dict[str, Any]]:
+    def consum_prices(self) -> dict[str, dict[str, Any]]:
         """Offpeak hours prices."""
-        return self._off_pricings
+        return self._pricings.get("consumption", {})
 
     @property
     def production_stats(self) -> list[dict[str, Any]]:
@@ -438,7 +442,8 @@ class EnedisByPDL:
             groupby=True,
             summary=True,
             prices=self.prod_prices,
-            cumsums=self._prod_sum,
+            cum_value=self._sum.get("production", {}),
+            cum_price=self._sum_price.get("production", {}),
             start_date=self.start_date,
         )
         return resultat
@@ -455,8 +460,9 @@ class EnedisByPDL:
             intervals=self.intervals,
             groupby=True,
             summary=True,
-            prices=self.off_prices,
-            cumsums=self._consum_sum,
+            prices=self.consum_prices,
+            cum_value=self._sum.get("consumption", {}),
+            cum_price=self._sum_price.get("consumption", {}),
             tempo=self.tempo,
             start_date=self.start_date,
         )
@@ -542,8 +548,9 @@ class EnedisByPDL:
         if isinstance(intervals, list):
             self._intervals = intervals
 
-    def set_consumption_prices(
+    def set_prices(
         self,
+        mode: str,
         price_std: int | float | None = None,
         price_off: int | float | None = None,
         blue: int | float | None = None,
@@ -568,44 +575,36 @@ class EnedisByPDL:
                 "red": red_off,
             },
         }
-        self._off_pricings["standard"] = {
+        original["standard"] = {
             k: v for k, v in original["standard"].items() if v is not None
         }
 
-        self._off_pricings["offpeak"] = {
+        original["offpeak"] = {
             k: v for k, v in original["offpeak"].items() if v is not None
         }
         if price_std and price_off:
             self.offpeak_subscription(True)
         if blue and white and red:
             self.tempo_subscription(True)
-        print(self._off_pricings)
 
-    def set_production_prices(self, std: int | float) -> None:
-        """Set intervals."""
-        self._prod_pricings = {"standard": {"price": std}}
+        self._pricings.update({mode: original})
 
-    def set_consumption_sum(
-        self,
-        value: int | float,
-        price: int | float | None = None,
-        off_value: int | float | None = None,
-        off_price: int | float | None = None,
+    def set_cumsum_value(
+        self, mode: str, value: int | float, off_value: int | float | None = None
     ) -> None:
         """Set cumulative summary for consumption."""
-        original = {
-            "standard": {"sum_value": value, "sum_price": price},
-            "offpeak": {"sum_value": off_value, "sum_price": off_price},
-        }
-        self._consum_sum["standard"] = {
-            k: v for k, v in original["standard"].items() if v is not None
-        }
+        original = {"standard": {"sum_value": value}}
+        if off_value is not None:
+            original.update({"offpeak": {"sum_value": off_value}})
 
-        self._consum_sum["offpeak"] = {
-            k: v for k, v in original["offpeak"].items() if v is not None
-        }
-        print(self._consum_sum)
+        self._sum.update({mode: original})
 
-    def set_production_sum(self, value: int | float, price: int | float) -> None:
-        """Set intervals."""
-        self._prod_sum = {"standard": {"sum_value": value, "sum_price": price}}
+    def set_cumsum_price(
+        self, mode: str, price: int | float, off_price: int | float | None = None
+    ) -> None:
+        """Set cumulative summary for consumption."""
+        original = {"standard": {"sum_price": price}}
+        if off_price is not None:
+            original.update({"offpeak": {"sum_price": off_price}})
+
+        self._sum_price.update({mode: original})

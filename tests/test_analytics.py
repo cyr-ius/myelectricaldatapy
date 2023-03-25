@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -18,10 +19,40 @@ TOKEN = "xxxxxxxxxxxxx"
 
 
 @pytest.mark.asyncio
-async def test_hours_analytics() -> None:
-    """Test analytics compute."""
+async def test_compute() -> None:
+    """Test standard."""
     dataset = DS_30
-    prices = [0.17]
+    with patch.object(
+        myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
+    ):
+        api = EnedisByPDL(
+            pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
+        )
+        await api.async_update()
+        resultat = api.consumption_stats
+
+    assert resultat[0]["notes"] == "standard"
+    assert resultat[0]["value"] == 1.296
+
+    dataset = DS_DAILY
+    with patch.object(
+        myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
+    ):
+        api = EnedisByPDL(
+            pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
+        )
+        await api.async_update()
+        resultat = api.consumption_stats
+
+    assert resultat[0]["notes"] == "standard"
+    assert resultat[0]["value"] == 42.045
+
+
+@pytest.mark.asyncio
+async def test_without_offpeak() -> None:
+    """Test without offpeak , with price."""
+    dataset = DS_30
+    prices: dict[str, Any] = {"mode": "consumption", "price_std": 0.17}
     # Test standard price
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
@@ -29,17 +60,44 @@ async def test_hours_analytics() -> None:
         api = EnedisByPDL(
             pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
         )
-        api.set_consumption_prices(*prices)
+        api.set_prices(**prices)
         await api.async_update()
         resultat = api.consumption_stats
 
     assert resultat[0]["notes"] == "standard"
-    assert resultat[0]["value"] == 1.296
+    assert round(resultat[0]["price"], 2) == 0.22
 
-    # Test price with offpeak and full hours
-    cumsums = [1000, 0, 1000, 0]
-    prices = [0.17, 0.18]
+    dataset = DS_DAILY
+    with patch.object(
+        myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
+    ):
+        api = EnedisByPDL(
+            pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
+        )
+        api.set_prices(**prices)
+        await api.async_update()
+        resultat = api.consumption_stats
+
+    assert resultat[0]["notes"] == "standard"
+    assert round(resultat[0]["price"], 2) == 7.15
+
+
+@pytest.mark.asyncio
+async def test_with_offpeak() -> None:
+    """Test without offpeak , with price."""
+    dataset = DS_30
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
+    prices: dict[str, Any] = {
+        "mode": "consumption",
+        "price_std": 0.17,
+        "price_off": 0.18,
+    }
+    cumsum_value: dict[str, Any] = {
+        "mode": "consumption",
+        "value": 1000,
+        "off_value": 1000,
+    }
+    cumsum_price: dict[str, Any] = {"mode": "consumption", "price": 0, "off_price": 0}
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
     ):
@@ -47,8 +105,9 @@ async def test_hours_analytics() -> None:
             pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
         )
         api.set_intervals(intervals)
-        api.set_consumption_prices(*prices)
-        api.set_consumption_sum(*cumsums)
+        api.set_prices(**prices)
+        api.set_cumsum_value(**cumsum_value)
+        api.set_cumsum_price(**cumsum_price)
         await api.async_update()
         resultat = api.consumption_stats
 
@@ -58,6 +117,7 @@ async def test_hours_analytics() -> None:
     assert resultat[0].get("sum_price") is not None
     print(resultat)
 
+    # Without cums
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
     ):
@@ -65,7 +125,7 @@ async def test_hours_analytics() -> None:
             pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
         )
         api.set_intervals(intervals)
-        api.set_consumption_prices(*prices)
+        api.set_prices(**prices)
         await api.async_update()
         resultat = api.consumption_stats
 
@@ -75,6 +135,7 @@ async def test_hours_analytics() -> None:
     assert resultat[0].get("sum_value") is None
     print(resultat)
 
+    # Whitout price
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
     ):
@@ -88,6 +149,7 @@ async def test_hours_analytics() -> None:
     assert resultat[28]["value"] == 0.618
     print(resultat)
 
+    # Daily
     dataset = DS_DAILY
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
@@ -96,8 +158,9 @@ async def test_hours_analytics() -> None:
             pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
         )
         api.set_intervals(intervals)
-        api.set_consumption_prices(*prices)
-        api.set_consumption_sum(*cumsums)
+        api.set_prices(**prices)
+        api.set_cumsum_value(**cumsum_value)
+        api.set_cumsum_price(**cumsum_price)
         await api.async_update()
         resultat = api.consumption_stats
 
@@ -106,8 +169,12 @@ async def test_hours_analytics() -> None:
 
 
 @pytest.mark.asyncio
-async def test_daily_analytics() -> None:
-    prices = [0.17, 0.18]
+async def test_daily_with_offpeak_analytics() -> None:
+    prices: dict[str, Any] = {
+        "mode": "consumption",
+        "price_std": 0.17,
+        "price_off": 0.18,
+    }
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
     dataset = DS_DAILY
     with patch.object(
@@ -117,7 +184,7 @@ async def test_daily_analytics() -> None:
             pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
         )
         api.set_intervals(intervals)
-        api.set_consumption_prices(*prices)
+        api.set_prices(**prices)
         await api.async_update()
         resultat = api.consumption_stats
     assert resultat[359]["value"] == 68.68
@@ -125,9 +192,14 @@ async def test_daily_analytics() -> None:
 
 
 @pytest.mark.asyncio
-async def test_compare_analytics() -> None:
-    prices = [0.17, 0.18]
-    cumsums = [0, 0, 0, 0]
+async def test_compare() -> None:
+    prices: dict[str, Any] = {
+        "mode": "consumption",
+        "price_std": 0.17,
+        "price_off": 0.18,
+    }
+    cumsum_value: dict[str, Any] = {"mode": "consumption", "value": 0, "off_value": 0}
+    cumsum_price: dict[str, Any] = {"mode": "consumption", "price": 0, "off_price": 0}
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
     dataset = DS_30
     with patch.object(
@@ -137,8 +209,9 @@ async def test_compare_analytics() -> None:
             pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
         )
         api.set_intervals(intervals)
-        api.set_consumption_prices(*prices)
-        api.set_consumption_sum(*cumsums)
+        api.set_prices(**prices)
+        api.set_cumsum_value(**cumsum_value)
+        api.set_cumsum_price(**cumsum_price)
         await api.async_update()
         resultat1 = api.consumption_stats
 
@@ -157,8 +230,9 @@ async def test_compare_analytics() -> None:
             pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
         )
         api.set_intervals(intervals)
-        api.set_consumption_prices(*prices)
-        api.set_consumption_sum(*cumsums)
+        api.set_prices(**prices)
+        api.set_cumsum_value(**cumsum_value)
+        api.set_cumsum_price(**cumsum_price)
         await api.async_update()
         resultat2 = api.consumption_stats
     assert round(sum_value, 3) == resultat2[2]["sum_value"]
@@ -166,9 +240,18 @@ async def test_compare_analytics() -> None:
 
 
 @pytest.mark.asyncio
-async def test_cumsums_analytics() -> None:
-    prices = [0.17, 0.18]
-    cumsums = [100, 50, 1000, 75]
+async def test_cumsums() -> None:
+    prices: dict[str, Any] = {
+        "mode": "consumption",
+        "price_std": 0.17,
+        "price_off": 0.18,
+    }
+    cumsum_value: dict[str, Any] = {
+        "mode": "consumption",
+        "value": 100,
+        "off_value": 1000,
+    }
+    cumsum_price: dict[str, Any] = {"mode": "consumption", "price": 50, "off_price": 75}
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
     dataset = DS_30
     with patch.object(
@@ -178,8 +261,9 @@ async def test_cumsums_analytics() -> None:
             pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
         )
         api.set_intervals(intervals)
-        api.set_consumption_prices(*prices)
-        api.set_consumption_sum(*cumsums)
+        api.set_prices(**prices)
+        api.set_cumsum_value(**cumsum_value)
+        api.set_cumsum_price(**cumsum_price)
         await api.async_update()
         resultat = api.consumption_stats
     # offpeak
@@ -191,9 +275,10 @@ async def test_cumsums_analytics() -> None:
 
 
 @pytest.mark.asyncio
-async def test_tempo_analytics() -> None:
+async def test_tempo() -> None:
     """Test tempo pricings."""
-    prices = {
+    prices: dict[str, Any] = {
+        "mode": "consumption",
         "blue": 0.2,
         "white": 0.3,
         "red": 3,
@@ -201,7 +286,12 @@ async def test_tempo_analytics() -> None:
         "white_off": 0.2,
         "red_off": 1.5,
     }
-    cumsums = [100, 50, 1000, 75]
+    cumsum_value: dict[str, Any] = {
+        "mode": "consumption",
+        "value": 100,
+        "off_value": 1000,
+    }
+    cumsum_price: dict[str, Any] = {"mode": "consumption", "price": 50, "off_price": 75}
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
     dataset = DS_30
     with patch.object(
@@ -213,8 +303,9 @@ async def test_tempo_analytics() -> None:
             pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
         )
         api.set_intervals(intervals)
-        api.set_consumption_prices(**prices)
-        api.set_consumption_sum(*cumsums)
+        api.set_prices(**prices)
+        api.set_cumsum_value(**cumsum_value)
+        api.set_cumsum_price(**cumsum_price)
         await api.async_update()
         resultat = api.consumption_stats
 
@@ -225,11 +316,21 @@ async def test_tempo_analytics() -> None:
 
 
 @pytest.mark.asyncio
-async def test_standard_analytics() -> None:
-    cumsums = [100, 50, 1000, 75]
+async def test_standard_offpeak_cumsum() -> None:
+    """Test with offpeak and cumsum."""
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
     dataset = DS_30
-    prices = {"price_std": 0.5, "price_off": 1}
+    prices: dict[str, Any] = {"mode": "consumption", "price_std": 0.5, "price_off": 1}
+    cumsum_value: dict[str, Any] = {
+        "mode": "consumption",
+        "value": 100,
+        "off_value": 50,
+    }
+    cumsum_price: dict[str, Any] = {
+        "mode": "consumption",
+        "price": 1000,
+        "off_price": 75,
+    }
 
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
@@ -238,13 +339,15 @@ async def test_standard_analytics() -> None:
             pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
         )
         api.set_intervals(intervals)
-        api.set_consumption_prices(**prices)
-        api.set_consumption_sum(*cumsums)
+        api.set_prices(**prices)
+        api.set_cumsum_value(**cumsum_value)
+        api.set_cumsum_price(**cumsum_price)
         await api.async_update()
         resultat = api.consumption_stats
 
     assert resultat[0]["value"] == 1.079
-    prices = {"price_std": 0.5, "price_off": 1}
+
+    # Test daily data , check ignore intervals.
     dataset = DS_DAILY
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
@@ -253,8 +356,9 @@ async def test_standard_analytics() -> None:
             pdl=PDL, token=TOKEN, svc_consumption="consumption_load_curve"
         )
         api.set_intervals(intervals)
-        api.set_consumption_prices(**prices)
-        api.set_consumption_sum(*cumsums)
+        api.set_prices(**prices)
+        api.set_cumsum_value(**cumsum_value)
+        api.set_cumsum_price(**cumsum_price)
         await api.async_update()
         resultat = api.consumption_stats
 
@@ -262,7 +366,8 @@ async def test_standard_analytics() -> None:
 
 
 @pytest.mark.asyncio
-async def test_start_date_analytics() -> None:
+async def test_start_date() -> None:
+    """Test with start_date."""
     dataset = DS_DAILY
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
