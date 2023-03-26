@@ -251,7 +251,7 @@ class Enedis:
         """Return all adresses information."""
         return await self.async_fetch_datas("adresses", pdl)
 
-    async def async_get_tempoday(
+    async def async_get_tempo(
         self, start: dt | None = None, end: dt | None = None
     ) -> Any:
         """Return Tempo Day."""
@@ -400,14 +400,20 @@ class EnedisByPDL:
         return self._ecowatt
 
     @property
+    def ecowatt_day(self) -> dict[str, Any]:
+        """ecowatt."""
+        str_date = dt.now().strftime("%Y-%m-%d")
+        return self._ecowatt.get(str_date, {})
+
+    @property
     def max_power(self) -> dict[str, Any]:
         """max_power."""
         return self._max_power
 
     @property
-    def tempoday(self) -> str | None:
+    def tempo_day(self) -> str | None:
         """Tempo day."""
-        str_date = dt.now().strftime("%Y-%m-%d")
+        str_date = dt.now().strftime("%Y-%-m-%-d")
         return self._tempo.get(str_date)
 
     @property
@@ -536,7 +542,7 @@ class EnedisByPDL:
                 self.pdl, start_consum, end
             )
             if self._tempo_subs:
-                self._tempo = await self._api.async_get_tempoday(start_consum, end)
+                self._tempo = await self._api.async_get_tempo(start_consum, end)
 
         self._last_access = dt.now().date()
 
