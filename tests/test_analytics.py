@@ -5,6 +5,7 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
+from freezegun import freeze_time
 
 import myelectricaldatapy
 from myelectricaldatapy import EnedisByPDL
@@ -240,6 +241,7 @@ async def test_cumsums() -> None:
     assert resultat[27]["sum_price"] == resultat[27]["price"] + 50
 
 
+@freeze_time("2023-3-3")
 @pytest.mark.asyncio
 async def test_tempo() -> None:
     """Test tempo pricings."""
@@ -272,9 +274,7 @@ async def test_tempo() -> None:
     api.set_cumsum_price("consumption", cumsum_price)
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
-    ), patch.object(
-        myelectricaldatapy.Enedis, "async_get_tempoday", return_value=TEMPO
-    ):
+    ), patch.object(myelectricaldatapy.Enedis, "async_get_tempo", return_value=TEMPO):
         await api.async_update(svc_consumption="consumption_load_curve")
         resultat = api.consumption_stats
 
@@ -282,6 +282,17 @@ async def test_tempo() -> None:
     assert resultat[0]["value"] == 1.079
     assert resultat[0]["sum_price"] == resultat[0]["price"] + 75
     assert resultat[0]["sum_value"] == resultat[0]["value"] + 1000
+    assert api.tempo_day == "blue"
+
+    # Check Daily -> compute not possible.
+    dataset = DS_DAILY
+    api = EnedisByPDL(pdl=PDL, token=TOKEN)
+    with patch.object(
+        myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
+    ), patch.object(myelectricaldatapy.Enedis, "async_get_tempo", return_value=TEMPO):
+        await api.async_update(svc_production="daily_production")
+        resultat = api.production_stats
+    assert resultat[0].get("tempo") is None
 
 
 @pytest.mark.asyncio
