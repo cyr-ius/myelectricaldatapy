@@ -357,13 +357,13 @@ class EnedisByPDL:
         self._off_subs: bool = False
         self._ecowatt_subs: bool = False
         self._maxpower_subs: bool = False
-        self._intervals: list[Tuple[str, str]] = []
-        self._access: dict[str, Any] = {}
-        self._contract: dict[str, Any] = {}
-        self._address: dict[str, Any] = {}
-        self._tempo: dict[str, Any] = {}
-        self._ecowatt: dict[str, Any] = {}
-        self._max_power: dict[str, Any] = {}
+        self.intervals: list[Tuple[str, str]] = []
+        self.access: dict[str, Any] = {}
+        self.contract: dict[str, Any] = {}
+        self.address: dict[str, Any] = {}
+        self.tempo: dict[str, Any] = {}
+        self.ecowatt: dict[str, Any] = {}
+        self.max_power: dict[str, Any] = {}
         self._consumption: dict[str, Any] = {}
         self._production: dict[str, Any] = {}
         self._pricings: dict[str, Any] = {}
@@ -377,49 +377,19 @@ class EnedisByPDL:
     @property
     def is_connected(self) -> bool:
         """Connect state."""
-        return self._access.get("valid", False) is True
-
-    @property
-    def contract(self) -> dict[str, Any]:
-        """Contact."""
-        return self._contract
-
-    @property
-    def address(self) -> dict[str, Any]:
-        """Address."""
-        return self._address
-
-    @property
-    def tempo(self) -> dict[str, Any]:
-        """Tempo."""
-        return self._tempo
-
-    @property
-    def ecowatt(self) -> dict[str, Any]:
-        """ecowatt."""
-        return self._ecowatt
+        return self.access.get("valid", False) is True
 
     @property
     def ecowatt_day(self) -> dict[str, Any]:
         """ecowatt."""
         str_date = dt.now().strftime("%Y-%m-%d")
-        return self._ecowatt.get(str_date, {})
-
-    @property
-    def max_power(self) -> dict[str, Any]:
-        """max_power."""
-        return self._max_power
+        return self.ecowatt.get(str_date, {})
 
     @property
     def tempo_day(self) -> str | None:
         """Tempo day."""
         str_date = dt.now().strftime("%Y-%-m-%-d")
-        return self._tempo.get(str_date)
-
-    @property
-    def intervals(self) -> list[Tuple[str, str]]:
-        """Offpeak hours intervals."""
-        return self._intervals
+        return self.tempo.get(str_date)
 
     @property
     def prod_prices(self) -> dict[str, dict[str, Any]]:
@@ -495,7 +465,7 @@ class EnedisByPDL:
         If the update succeeds, the next one can only be done on the next day
         at least that force_refresh is true
         """
-        self._access = await self._api.async_valid_access(self.pdl)
+        self.access = await self._api.async_valid_access(self.pdl)
         if (
             self._last_access is not None
             and self._last_access > dt.now().date()
@@ -507,16 +477,16 @@ class EnedisByPDL:
         self._date_production = date_production
         self._date_consumption = date_consumption
 
-        self._contract = await self._api.async_get_contract(self.pdl)
-        self._address = await self._api.async_get_address(self.pdl)
+        self.contract = await self._api.async_get_contract(self.pdl)
+        self.address = await self._api.async_get_address(self.pdl)
 
         if self._ecowatt_subs:
             start_eco = start if start else dt.now() - timedelta(days=730)
-            self._ecowatt = await self._api.async_get_ecowatt(start_eco, end)
+            self.ecowatt = await self._api.async_get_ecowatt(start_eco, end)
 
-        if self._max_power:
+        if self._maxpower_subs:
             start_max = start if start else dt.now() - timedelta(days=730)
-            self._max_power = await self._api.async_get_max_power(
+            self.max_power = await self._api.async_get_max_power(
                 self.pdl, start_max, end
             )
 
@@ -542,7 +512,7 @@ class EnedisByPDL:
                 self.pdl, start_consum, end
             )
             if self._tempo_subs:
-                self._tempo = await self._api.async_get_tempo(start_consum, end)
+                self.tempo = await self._api.async_get_tempo(start_consum, end)
 
         self._last_access = dt.now().date()
 
@@ -567,7 +537,7 @@ class EnedisByPDL:
     def set_intervals(self, intervals: list[Tuple[str, str]]) -> None:
         """Set intervals."""
         if isinstance(intervals, list):
-            self._intervals = intervals
+            self.intervals = intervals
 
     def set_prices(
         self,
