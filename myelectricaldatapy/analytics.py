@@ -120,13 +120,13 @@ class EnedisAnalytics:
                 for note in notes:
                     self.df.loc[(self.df.notes == note), "sum_price"] = self.df[
                         (self.df.notes == note)
-                    ].price.cumsum() + cum_price.get(note, {}).get("sum_price", 0)
+                    ].price.cumsum() + cum_price.get(note, 0)
 
         if summary:
             for note in notes:
                 self.df.loc[(self.df.notes == note), "sum_value"] = self.df[
                     (self.df.notes == note)
-                ].value.cumsum() + cum_value.get(note, {}).get("sum_value", 0)
+                ].value.cumsum() + cum_value.get(note, 0)
 
         return self.df.to_dict(orient="records")
 

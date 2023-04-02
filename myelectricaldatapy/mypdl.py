@@ -63,14 +63,8 @@ PRICE_SCH = vol.Schema(
 
 CUM_SCH = vol.Schema(
     {
-        vol.Required(STANDARD): {
-            vol.Optional("sum_value"): vol.Any(int, float),
-            vol.Optional("sum_price"): vol.Any(int, float),
-        },
-        vol.Optional(OFFPEAK): {
-            vol.Optional("sum_value"): vol.Any(int, float),
-            vol.Optional("sum_price"): vol.Any(int, float),
-        },
+        vol.Required(STANDARD): vol.Any(int, float),
+        vol.Optional(OFFPEAK): vol.Any(int, float),
     }
 )
 

@@ -87,20 +87,10 @@ async def test_with_offpeak() -> None:
     dataset = DS_30
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
     prices: dict[str, Any] = {"standard": {"price": 0.17}, "offpeak": {"price": 0.18}}
-    cumsum_value: dict[str, Any] = {
-        "standard": {"sum_value": 1000},
-        "offpeak": {"sum_value": 1000},
-    }
-    cumsum_price: dict[str, Any] = {
-        "standard": {"sum_price": 0},
-        "offpeak": {"sum_price": 0},
-    }
     modes = {"consumption": {"service": "consumption_load_curve"}}
     api = EnedisByPDL(pdl=PDL, token=TOKEN)
     api.set_intervals("consumption", intervals)
     api.set_prices("consumption", prices)
-    api.set_cumsum("consumption", "value", cumsum_value)
-    api.set_cumsum("consumption", "price", cumsum_price)
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
     ):
@@ -146,8 +136,6 @@ async def test_with_offpeak() -> None:
     modes = {"consumption": {"service": "daily_consumption"}}
     api = EnedisByPDL(pdl=PDL, token=TOKEN)
     api.set_prices("consumption", prices)
-    api.set_cumsum("consumption", "value", cumsum_value)
-    api.set_cumsum("consumption", "price", cumsum_price)
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
     ):
@@ -229,14 +217,8 @@ async def test_compare() -> None:
 async def test_cumsums() -> None:
     """Test cummulative summary."""
     prices: dict[str, Any] = {"standard": {"price": 0.17}, "offpeak": {"price": 0.18}}
-    cumsum_value: dict[str, Any] = {
-        "standard": {"sum_value": 100},
-        "offpeak": {"sum_value": 1000},
-    }
-    cumsum_price: dict[str, Any] = {
-        "standard": {"sum_price": 50},
-        "offpeak": {"sum_price": 75},
-    }
+    cumsum_value: dict[str, Any] = {"standard": 100, "offpeak": 1000}
+    cumsum_price: dict[str, Any] = {"standard": 50, "offpeak": 75}
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
     dataset = DS_30
     modes = {
@@ -280,14 +262,8 @@ async def test_tempo() -> None:
             "red": 1.5,
         },
     }
-    cumsum_value: dict[str, Any] = {
-        "standard": {"sum_value": 100},
-        "offpeak": {"sum_value": 1000},
-    }
-    cumsum_price: dict[str, Any] = {
-        "standard": {"sum_price": 50},
-        "offpeak": {"sum_price": 75},
-    }
+    cumsum_value: dict[str, Any] = {"standard": 100, "offpeak": 1000}
+    cumsum_price: dict[str, Any] = {"standard": 50, "offpeak": 75}
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
     dataset = DS_30
     modes = {"consumption": {"service": "consumption_load_curve"}}
