@@ -7,7 +7,8 @@ from .exceptions import (
     LimitReached,
     TimeoutExceededError,
 )
-from .myelectricaldata import Enedis, EnedisByPDL
+from .myelectricaldata import Enedis
+from .mypdl import EnedisByPDL
 
 __all__ = [
     "Enedis",

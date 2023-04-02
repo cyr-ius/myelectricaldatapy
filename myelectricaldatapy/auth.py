@@ -10,15 +10,13 @@ from typing import Any
 import async_timeout
 from aiohttp import ClientError, ClientSession
 
+from .const import TIMEOUT, URL
 from .exceptions import (
     EnedisException,
     HttpRequestError,
     LimitReached,
     TimeoutExceededError,
 )
-
-URL = "https://myelectricaldata.fr"
-TIMEOUT = 30
 
 _LOGGER = logging.getLogger(__name__)
 
