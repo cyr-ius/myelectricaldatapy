@@ -38,6 +38,6 @@ setup(
         "Framework :: AsyncIO",
         "Intended Audience :: Developers",
         "Intended Audience :: System Administrators",
-        "Topic :: Energy Automation",
+        "Topic :: Home Automation",
     ],
 )
