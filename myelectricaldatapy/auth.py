@@ -73,9 +73,11 @@ class EnedisAuth:
                 raise EnedisException(response.status, json.loads(message))
             raise EnedisException(response.status, {"message": message})
 
-        _LOGGER.debug("Response %s (%s)", response, response.status)
-
         if "application/json" in content_type:
-            return await response.json()
+            rslt = await response.json()
+            _LOGGER.debug("Response %s", rslt)
+            return rslt
 
-        return await response.text()
+        rslt = await response.text()
+        _LOGGER.debug("Response %s", rslt)
+        return rslt
