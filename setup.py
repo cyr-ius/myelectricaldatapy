@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
-Provides setup.
-"""
+"""Provides setup."""
 import os
 
 from setuptools import find_packages, setup
