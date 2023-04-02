@@ -100,6 +100,7 @@ class EnedisAnalytics:
         if tempo:
             self._set_tempo_days(tempo)
 
+        notes = list(self.df.notes.drop_duplicates())
         if prices:
             for mode, values in prices.items():
                 if isinstance(values, dict):
@@ -117,16 +118,16 @@ class EnedisAnalytics:
                             )
 
             if summary:
-                for mode, sums in cum_price.items():
-                    self.df.loc[(self.df.notes == mode), "sum_price"] = self.df[
-                        (self.df.notes == mode)
-                    ].price.cumsum() + sums.get("sum_price")
+                for note in notes:
+                    self.df.loc[(self.df.notes == note), "sum_price"] = self.df[
+                        (self.df.notes == note)
+                    ].price.cumsum() + cum_price.get(note, {}).get("sum_price", 0)
 
         if summary:
-            for mode, sums in cum_value.items():
-                self.df.loc[(self.df.notes == mode), "sum_value"] = self.df[
-                    (self.df.notes == mode)
-                ].value.cumsum() + sums.get("sum_value")
+            for note in notes:
+                self.df.loc[(self.df.notes == note), "sum_value"] = self.df[
+                    (self.df.notes == note)
+                ].value.cumsum() + cum_value.get(note, {}).get("sum_value", 0)
 
         return self.df.to_dict(orient="records")
 

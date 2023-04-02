@@ -126,7 +126,7 @@ async def test_with_offpeak() -> None:
     assert resultat[0]["notes"] == "offpeak"
     assert resultat[0]["value"] == 1.079
     assert round(resultat[2]["price"], 3) == 0.833
-    assert resultat[0].get("sum_value") is None
+    assert resultat[0].get("sum_value") == 1.079
     print(resultat)
 
     # Whitout price
