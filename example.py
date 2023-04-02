@@ -6,7 +6,7 @@ import asyncio
 import logging
 from datetime import datetime, timedelta
 
-from myelectricaldatapy import EnedisByPDL, EnedisException
+from myelectricaldatapy import Enedis, EnedisByPDL, EnedisException
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -24,7 +24,7 @@ TOKEN = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 async def main() -> None:
     """Main function."""
 
-    api = EnedisByPDL(token=TOKEN)
+    api = Enedis(token=TOKEN)
 
     try:
         start = datetime.now() - timedelta(days=7)
@@ -38,7 +38,9 @@ async def main() -> None:
     except EnedisException as error:
         logger.error(error)
 
-    await api.async_close()
+    myPdl = EnedisByPDL(PDL, TOKEN)
+    await myPdl.async_update()
+    print(myPdl.stats)
 
 
 loop = asyncio.get_event_loop()
