@@ -72,12 +72,11 @@ class EnedisAnalytics:
         if self.df.empty:
             return self.df.to_dict(orient="records")
 
-        if step_hour:
-            self.df.interval_length = self.df.interval_length.transform(
-                self._weighted_interval
-            )
-        else:
-            self.df.interval_length = 1
+        self.df.interval_length = (
+            self.df.interval_length.transform(self._weighted_interval)
+            if step_hour
+            else 1
+        )
 
         if convertKwh:
             self.df.value = (
@@ -156,10 +155,3 @@ class EnedisAnalytics:
         for str_date, value in tempo.items():
             dt_date = pd.to_datetime(str_date, format="%Y-%m-%d")
             self.df.loc[(self.df.date.dt.date == dt_date.date()), "tempo"] = value
-
-    def get_last_value(self, data: dict[str, Any], orderby: str, value: str) -> Any:
-        """Return last value after order by."""
-        df = pd.DataFrame(data)
-        if not df.empty and value in df.columns:
-            df = df.sort_values(by=orderby)
-            return df[value].iloc[-1]  # pylint: disable=unsubscriptable-object
