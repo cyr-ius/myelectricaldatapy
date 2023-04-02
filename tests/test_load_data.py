@@ -44,7 +44,6 @@ async def test_ecowatt() -> None:
     ):
         mypdl.ecowatt_subscription(True)
         await mypdl.async_update()
-        resultat = mypdl.consumption_stats
 
     print(mypdl.ecowatt_day)
     assert mypdl.ecowatt_day["message"] == "Pas d’alerte."
@@ -63,14 +62,13 @@ async def test_tempoday() -> None:
 
     mypdl = EnedisByPDL(pdl=PDL, token=TOKEN)
     dataset = DS_30
+    modes = {"consumption": {"service": "consumption_load_curve"}}
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
     ), patch.object(myelectricaldatapy.Enedis, "async_get_tempo", return_value=TEMPO):
         mypdl.tempo_subscription(True)
-        await mypdl.async_update(svc_consumption="consumption_load_curve")
-        resultat = mypdl.consumption_stats
-
-    print(mypdl.tempo_day)
+        await mypdl.async_update(modes=modes)
+        resultat = mypdl.stats["consumption"]
     assert mypdl.tempo_day == "blue"
 
 
