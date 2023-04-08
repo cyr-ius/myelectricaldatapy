@@ -9,6 +9,8 @@ from typing import Any, Collection, Tuple
 
 import pandas as pd
 
+from .const import ATTR_OFFPEAK, ATTR_STANDARD
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -67,7 +69,7 @@ class EnedisAnalytics:
             self.df.index = self.df.date
 
             # Add mark
-            self.df["notes"] = "standard"
+            self.df["notes"] = ATTR_STANDARD
 
         if self.df.empty:
             return self.df.to_dict(orient="records")
@@ -146,7 +148,7 @@ class EnedisAnalytics:
             self.df.loc[
                 (self.df.date.dt.time > start) & (self.df.date.dt.time <= end),
                 "notes",
-            ] = "offpeak"
+            ] = ATTR_OFFPEAK
 
         return self.df
 
