@@ -13,17 +13,21 @@ from myelectricaldatapy import Enedis
 
 from .analytics import EnedisAnalytics
 from .const import (
+    ATTR_CUM_PRICE,
+    ATTR_CUM_VALUE,
+    ATTR_END,
+    ATTR_INTERVALS,
+    ATTR_OFFPEAK,
+    ATTR_PRICES,
+    ATTR_SERVICE,
+    ATTR_STANDARD,
+    ATTR_START,
     CONSUMPTION,
-    CUM_PRICE,
-    CUM_VALUE,
     DAILY_CONSUM,
     DAILY_PROD,
     DETAIL_CONSUM,
     DETAIL_PROD,
-    OFFPEAK,
-    PRICES,
     PRODUCTION,
-    STANDARD,
     TIMEOUT,
 )
 
@@ -32,39 +36,48 @@ _LOGGER = logging.getLogger(__name__)
 MODES_SCH = vol.Schema(
     {
         vol.Optional(CONSUMPTION): {
-            vol.Required("service"): str,
-            vol.Optional("start"): dt,
-            vol.Optional("end"): dt,
+            vol.Required(ATTR_SERVICE): str,
+            vol.Optional(ATTR_START): dt,
+            vol.Optional(ATTR_END): dt,
         },
         vol.Optional(PRODUCTION): {
-            vol.Required("service"): str,
-            vol.Optional("start"): dt,
-            vol.Optional("end"): dt,
+            vol.Required(ATTR_SERVICE): str,
+            vol.Optional(ATTR_START): dt,
+            vol.Optional(ATTR_END): dt,
         },
     }
 )
 
 PRICE_SCH = vol.Schema(
     {
-        vol.Required(STANDARD): {
-            vol.Optional("price"): vol.Any(int, float),
-            vol.Optional("blue"): vol.Any(int, float),
-            vol.Optional("white"): vol.Any(int, float),
-            vol.Optional("red"): vol.Any(int, float),
+        vol.Required(ATTR_STANDARD): {
+            vol.Required("price"): vol.Any(int, float),
         },
-        vol.Optional(OFFPEAK): {
-            vol.Optional("price"): vol.Any(int, float),
-            vol.Optional("blue"): vol.Any(int, float),
-            vol.Optional("white"): vol.Any(int, float),
-            vol.Optional("red"): vol.Any(int, float),
+        vol.Optional(ATTR_OFFPEAK): {
+            vol.Required("price"): vol.Any(int, float),
+        },
+    }
+)
+
+PRICE_TEMPO_SCH = vol.Schema(
+    {
+        vol.Required(ATTR_STANDARD): {
+            vol.Required("blue"): vol.Any(int, float),
+            vol.Required("white"): vol.Any(int, float),
+            vol.Required("red"): vol.Any(int, float),
+        },
+        vol.Optional(ATTR_OFFPEAK): {
+            vol.Required("blue"): vol.Any(int, float),
+            vol.Required("white"): vol.Any(int, float),
+            vol.Required("red"): vol.Any(int, float),
         },
     }
 )
 
 CUM_SCH = vol.Schema(
     {
-        vol.Required(STANDARD): vol.Any(int, float),
-        vol.Optional(OFFPEAK): vol.Any(int, float),
+        vol.Required(ATTR_STANDARD): vol.Any(int, float),
+        vol.Optional(ATTR_OFFPEAK): vol.Any(int, float),
     }
 )
 
@@ -103,6 +116,11 @@ class EnedisByPDL:
         return self.access.get("valid", False) is True
 
     @property
+    def has_intervals(self) -> bool:
+        """Intervals exist."""
+        return len(self.intervals) > 0
+
+    @property
     def ecowatt_day(self) -> dict[str, Any]:
         """ecowatt."""
         str_date = dt.now().strftime("%Y-%m-%d")
@@ -117,12 +135,12 @@ class EnedisByPDL:
     @property
     def prod_prices(self) -> dict[str, Any] | None:
         """Production resel price."""
-        return self._params[PRODUCTION].get(PRICES)
+        return self._params[PRODUCTION].get(ATTR_PRICES)
 
     @property
     def consum_prices(self) -> dict[str, Any] | None:
         """Offpeak hours prices."""
-        return self._params[CONSUMPTION].get(PRICES)
+        return self._params[CONSUMPTION].get(ATTR_PRICES)
 
     @property
     def stats(self) -> dict[str, Any]:
@@ -138,13 +156,13 @@ class EnedisByPDL:
             resultat = analytics.get_data_analytics(
                 convertKwh=True,
                 convertUTC=False,
-                intervals=params.get("intervals", []),
+                intervals=params.get(ATTR_INTERVALS, []),
                 groupby=True,
                 summary=True,
-                prices=params.get(PRICES, {}),
-                cum_value=params.get(CUM_VALUE, {}),
-                cum_price=params.get(CUM_PRICE, {}),
-                start_date=params.get("start"),
+                prices=params.get(ATTR_PRICES, {}),
+                cum_value=params.get(ATTR_CUM_VALUE, {}),
+                cum_price=params.get(ATTR_CUM_PRICE, {}),
+                start_date=params.get(ATTR_START),
                 tempo=self.tempo,
             )
             stats.update({mode: resultat})
@@ -158,8 +176,16 @@ class EnedisByPDL:
         """Update data.
 
         modes = {
-            "consumption":{"service":"xxxxx", start: date, end:date},
-            "production":{"service":"xxxxx", start: date, end:date}
+            "consumption":{
+                "service":["daily_consumption" | "consumption_load_curve"],
+                start: [date],
+                end: [date]
+            },
+            "production":{
+                "service":["daily_production" | "production_load_curve"],
+                start: [date],
+                end: [date]
+            }
         }
         If the update succeeds, the next one can only be done on the next day
         at least that force_refresh is true
@@ -184,30 +210,31 @@ class EnedisByPDL:
         self.contract = await self._api.async_get_contract(self.pdl)
         self.address = await self._api.async_get_address(self.pdl)
         if self._ecowatt_subs:
-            self.ecowatt = await self._api.async_get_ecowatt(start, end)
+            self.ecowatt = await self._api.async_get_ecowatt(
+                start, end + timedelta(days=1)
+            )
         if self._maxpower_subs:
             self.max_power = await self._api.async_get_max_power(self.pdl, start, end)
         if modes:
             try:
                 validate = MODES_SCH(modes)
-                for mode, params in validate.items():
-                    if mode not in [CONSUMPTION, PRODUCTION]:
-                        continue
-                    service = params.get("service")
-                    days = 370 if service in [DAILY_PROD, DAILY_CONSUM] else 7
-                    func = funcs[params.get("service")]
-                    start = (
-                        params.get("start")
-                        if params.get("start")
-                        else dt.now() - timedelta(days=days)
-                    )
-                    end = params.get("end") if params.get("end") else dt.now()
-                    dataset = await func(self.pdl, start, end)
-                    self._params[mode].update({"dataset": dataset, "start": start})
-                    if service in [DAILY_CONSUM, DETAIL_CONSUM] and self._tempo_subs:
-                        self.tempo = await self._api.async_get_tempo(start, end)
             except vol.Error as error:
                 _LOGGER.error("The format is incorrect. (%s)", error)
+            else:
+                for mode, params in validate.items():
+                    service = params.get(ATTR_SERVICE)
+                    days = 370 if service in [DAILY_PROD, DAILY_CONSUM] else 7
+                    func = funcs[params.get(ATTR_SERVICE)]
+                    start = (
+                        params.get(ATTR_START)
+                        if params.get(ATTR_START)
+                        else dt.now() - timedelta(days=days)
+                    )
+                    end = params.get(ATTR_END) if params.get(ATTR_END) else dt.now()
+                    dataset = await func(self.pdl, start, end)
+                    self._params[mode].update({"dataset": dataset, ATTR_START: start})
+                    if service in [DAILY_CONSUM, DETAIL_CONSUM] and self._tempo_subs:
+                        self.tempo = await self._api.async_get_tempo(start, end)
 
         self._last_access = dt.now().date()
 
@@ -233,32 +260,49 @@ class EnedisByPDL:
         """Set intervals."""
         if isinstance(intervals, list):
             self.intervals = intervals
-            self._params[mode].update({"intervals": intervals})
+            self._params[mode].update({ATTR_INTERVALS: intervals})
 
     def set_prices(
         self,
         mode: str,
         prices: dict[str, Any],
     ) -> None:
-        """Set intervals."""
+        """Set intervals.
+
+        prices = {
+            "standard":{"price":[float]},
+            "offpeak":{"price":[float]}
+        }
+        or
+        prices = {
+            "standard":{"blue":[float],"white":[float],"red":[float]},
+            "offpeak":{"blue":[float],"white":[float],"red":[float]}
+        }
+        """
         try:
             validate = PRICE_SCH(prices)
-            if "blue" not in validate.get(OFFPEAK, {}):
-                self.offpeak_subscription(True)
-            if "blue" in validate.get(OFFPEAK, {}):
+        except vol.Error:
+            try:
+                validate = PRICE_TEMPO_SCH(prices)
+            except vol.Error as error:
+                _LOGGER.error("Format is incorrect (%s)", error)
+            else:
                 self.tempo_subscription(True)
-            self._params[mode].update({PRICES: validate})
-        except vol.Error as error:
-            _LOGGER.error("Format is incorrect (%s)", error)
+                self._params[mode].update({ATTR_PRICES: validate})
+        else:
+            self.offpeak_subscription(True)
+            self._params[mode].update({ATTR_PRICES: validate})
 
     def set_cumsum(self, mode: str, form: str, cum_sum: dict[str, Any]) -> None:
-        """Set cumulative summary for consumption.
+        """Set cumulative summary.
 
         mode: "production" or "consumption"
         format: "value" or "price"
+        cum_sum = {"standard":[float], "offpeak":[float]}
         """
         try:
             validate = CUM_SCH(cum_sum)
-            self._params[mode].update({f"cum_{form}".lower(): validate})
         except vol.Error as error:
             _LOGGER.error("Format is incorrect (%s)", error)
+        else:
+            self._params[mode].update({f"cum_{form}".lower(): validate})
