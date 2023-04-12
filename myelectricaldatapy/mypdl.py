@@ -192,9 +192,9 @@ class EnedisByPDL:
         """
         self.access = await self._api.async_valid_access(self.pdl)
         if (
-            self._last_access is not None
-            and self._last_access > dt.now().date()
-            and force_refresh is False
+            force_refresh is False
+            and self._last_access is not None
+            and self._last_access == dt.now().date()
         ):
             return
 
