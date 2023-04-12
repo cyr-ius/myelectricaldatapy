@@ -42,7 +42,7 @@ async def test_compute() -> None:
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
     ):
-        await api.async_update(modes=modes)
+        await api.async_update(modes=modes, force_refresh=True)
         resultat = api.stats["consumption"]
 
     assert resultat[0]["notes"] == "standard"
@@ -73,7 +73,7 @@ async def test_without_offpeak() -> None:
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
     ):
-        await api.async_update(modes=modes)
+        await api.async_update(modes=modes, force_refresh=True)
         resultat = api.stats["consumption"]
 
     assert resultat[0]["notes"] == "standard"
@@ -206,7 +206,7 @@ async def test_compare() -> None:
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
     ):
-        await api.async_update(modes=modes)
+        await api.async_update(modes=modes, force_refresh=True)
         resultat2 = api.stats["consumption"]
     assert round(sum_value, 3) == resultat2[2]["sum_value"]
     print(resultat2)
