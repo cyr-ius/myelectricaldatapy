@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import logging
-from datetime import date
 from datetime import datetime as dt
 from datetime import timedelta
 from typing import Any, Callable, Tuple
@@ -107,7 +106,6 @@ class EnedisByPDL:
         self.ecowatt: dict[str, Any] = {}
         self.max_power: dict[str, Any] = {}
         self._connected: bool = False
-        self._last_access: date | None = None
         self._params: dict[str, dict[str, Any]] = {PRODUCTION: {}, CONSUMPTION: {}}
 
     @property
@@ -168,11 +166,7 @@ class EnedisByPDL:
             stats.update({mode: resultat})
         return stats
 
-    async def async_update(
-        self,
-        modes: dict[str, Any] | None = None,
-        force_refresh: bool = False,
-    ) -> None:
+    async def async_update(self, modes: dict[str, Any] | None = None) -> None:
         """Update data.
 
         modes = {
@@ -187,19 +181,9 @@ class EnedisByPDL:
                 end: [date]
             }
         }
-        If the update succeeds, the next one can only be done on the next day
-        at least that force_refresh is true
         """
-        self.access = await self._api.async_valid_access(self.pdl)
-        if (
-            force_refresh is False
-            and self._last_access is not None
-            and self._last_access == dt.now().date()
-        ):
-            return
-
-        start = dt.now() - timedelta(days=730)
-        end = dt.now()
+        start = dt.now() - timedelta(days=1095)
+        end = dt.now() + timedelta(days=1)
         funcs: dict[str, Callable[..., Any]] = {
             DAILY_PROD: self._api.async_get_daily_production,
             DETAIL_PROD: self._api.async_get_details_production,
@@ -207,12 +191,11 @@ class EnedisByPDL:
             DETAIL_CONSUM: self._api.async_get_details_consumption,
         }
 
+        self.access = await self._api.async_valid_access(self.pdl)
         self.contract = await self._api.async_get_contract(self.pdl)
         self.address = await self._api.async_get_address(self.pdl)
         if self._ecowatt_subs:
-            self.ecowatt = await self._api.async_get_ecowatt(
-                start, end + timedelta(days=1)
-            )
+            self.ecowatt = await self._api.async_get_ecowatt(start, end)
         if self._maxpower_subs:
             self.max_power = await self._api.async_get_max_power(self.pdl, start, end)
         if modes:
@@ -225,18 +208,18 @@ class EnedisByPDL:
                     service = params.get(ATTR_SERVICE)
                     days = 370 if service in [DAILY_PROD, DAILY_CONSUM] else 7
                     func = funcs[params.get(ATTR_SERVICE)]
-                    start = (
+                    dt_start = (
                         params.get(ATTR_START)
                         if params.get(ATTR_START)
                         else dt.now() - timedelta(days=days)
                     )
-                    end = params.get(ATTR_END) if params.get(ATTR_END) else dt.now()
-                    dataset = await func(self.pdl, start, end)
-                    self._params[mode].update({"dataset": dataset, ATTR_START: start})
+                    dt_end = params.get(ATTR_END) if params.get(ATTR_END) else end
+                    dataset = await func(self.pdl, dt_start, dt_end)
+                    self._params[mode].update(
+                        {"dataset": dataset, ATTR_START: dt_start}
+                    )
                     if service in [DAILY_CONSUM, DETAIL_CONSUM] and self._tempo_subs:
-                        self.tempo = await self._api.async_get_tempo(start, end)
-
-        self._last_access = dt.now().date()
+                        self.tempo = await self._api.async_get_tempo(dt_start, dt_end)
 
     def tempo_subscription(self, activate: bool = False) -> None:
         """Enable or Disable Tempo Subscription."""
