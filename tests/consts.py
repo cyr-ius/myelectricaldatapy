@@ -4,8 +4,8 @@ ACCESS = {
     "call_number": 7,
     "quota_reached": False,
     "quota_limit": 50,
-    "quota_reset_at": "2023-01-14T23:59:59.999999",
-    "last_call": "2023-01-07T13:58:24.532501",
+    "quota_reset_at": "2023-03-01T23:59:59.999999",
+    "last_call": "2023-03-01T13:58:24.532501",
     "ban": False,
 }
 
@@ -16,7 +16,7 @@ INVALID_ACCESS = {
     "call_number": 65,
     "quota_reached": True,
     "quota_limit": 50,
-    "quota_reset_at": "2023-01-14T23:59:59.999999",
+    "quota_reset_at": "2023-01-07T23:59:59.999999",
     "last_call": "2023-01-07T13:58:24.532501",
     "ban": False,
 }

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime as dt
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 from freezegun import freeze_time
@@ -11,11 +11,7 @@ from freezegun import freeze_time
 import myelectricaldatapy
 from myelectricaldatapy import EnedisByPDL
 
-from .consts import ACCESS
-from .consts import DATASET_30 as DS_30
-from .consts import DATASET_DAILY as DS_DAILY
-from .consts import DATASET_DAILY_COMPARE as DS_COMPARE
-from .consts import TEMPO
+from .consts import DATASET_DAILY_COMPARE
 
 PDL = "012345"
 TOKEN = "xxxxxxxxxxxxx"
@@ -23,27 +19,20 @@ TOKEN = "xxxxxxxxxxxxx"
 
 @freeze_time("2023-03-01")
 @pytest.mark.asyncio
-async def test_compute() -> None:
+async def test_compute(mock_enedis: Mock) -> None:  # pylint: disable=unused-argument
     """Test standard."""
-    dataset = DS_30
-    modes = {"consumption": {"service": "consumption_load_curve"}}
     api = EnedisByPDL(pdl=PDL, token=TOKEN)
-    with patch.object(
-        myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
-    ):
-        await api.async_update(modes=modes)
-        resultat = api.stats["consumption"]
+    api.set_collects("consumption_load_curve")
+    await api.async_update()
+    resultat = api.stats["consumption"]
 
     assert resultat[0]["notes"] == "standard"
     assert resultat[0]["value"] == 1.296
 
-    dataset = DS_DAILY
-    modes = {"consumption": {"service": "daily_consumption"}}
-    with patch.object(
-        myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
-    ):
-        await api.async_update(modes=modes)
-        resultat = api.stats["consumption"]
+    api = EnedisByPDL(pdl=PDL, token=TOKEN)
+    api.set_collects("daily_consumption")
+    await api.async_update()
+    resultat = api.stats["consumption"]
 
     assert resultat[0]["notes"] == "standard"
     assert resultat[0]["value"] == 42.045
@@ -51,30 +40,24 @@ async def test_compute() -> None:
 
 @freeze_time("2023-03-01")
 @pytest.mark.asyncio
-async def test_without_offpeak() -> None:
+async def test_without_offpeak(
+    mock_enedis: Mock,
+) -> None:  # pylint: disable=unused-argument
     """Test without offpeak , with price."""
-    dataset = DS_30
+    await mock_enedis()
     prices: dict[str, Any] = {"standard": {"price": 0.17}}
-    modes = {"consumption": {"service": "consumption_load_curve"}}
     # Test standard price
     api = EnedisByPDL(pdl=PDL, token=TOKEN)
-    api.set_prices("consumption", prices)
-    with patch.object(
-        myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
-    ):
-        await api.async_update(modes=modes)
-        resultat = api.stats["consumption"]
+    api.set_collects("consumption_load_curve", prices=prices)
+    await api.async_update_collects()
+    resultat = api.stats["consumption"]
 
     assert resultat[0]["notes"] == "standard"
     assert round(resultat[0]["price"], 2) == 0.22
 
-    dataset = DS_DAILY
-    modes = {"consumption": {"service": "daily_consumption"}}
-    with patch.object(
-        myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
-    ):
-        await api.async_update(modes=modes)
-        resultat = api.stats["consumption"]
+    api.set_collects("daily_consumption", prices=prices)
+    await api.async_update_collects()
+    resultat = api.stats["consumption"]
 
     assert resultat[0]["notes"] == "standard"
     assert round(resultat[0]["price"], 2) == 7.15
@@ -82,20 +65,16 @@ async def test_without_offpeak() -> None:
 
 @freeze_time("2023-03-01")
 @pytest.mark.asyncio
-async def test_with_offpeak() -> None:
+async def test_with_offpeak(
+    mock_enedis: Mock,  # pylint: disable=unused-argument
+) -> None:
     """Test without offpeak , with price."""
-    dataset = DS_30
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
     prices: dict[str, Any] = {"standard": {"price": 0.17}, "offpeak": {"price": 0.18}}
-    modes = {"consumption": {"service": "consumption_load_curve"}}
     api = EnedisByPDL(pdl=PDL, token=TOKEN)
-    api.set_intervals("consumption", intervals)
-    api.set_prices("consumption", prices)
-    with patch.object(
-        myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
-    ):
-        await api.async_update(modes=modes)
-        resultat = api.stats["consumption"]
+    api.set_collects("consumption_load_curve", prices=prices, intervals=intervals)
+    await api.async_update_collects()
+    resultat = api.stats["consumption"]
 
     assert resultat[0]["notes"] == "offpeak"
     assert resultat[0]["value"] == 1.079
@@ -105,13 +84,9 @@ async def test_with_offpeak() -> None:
 
     # Without cums
     api = EnedisByPDL(pdl=PDL, token=TOKEN)
-    api.set_intervals("consumption", intervals)
-    api.set_prices("consumption", prices)
-    with patch.object(
-        myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
-    ):
-        await api.async_update(modes=modes)
-        resultat = api.stats["consumption"]
+    api.set_collects("consumption_load_curve", prices=prices, intervals=intervals)
+    await api.async_update_collects()
+    resultat = api.stats["consumption"]
 
     assert resultat[0]["notes"] == "offpeak"
     assert resultat[0]["value"] == 1.079
@@ -121,26 +96,18 @@ async def test_with_offpeak() -> None:
 
     # Whitout price
     api = EnedisByPDL(pdl=PDL, token=TOKEN)
-    api.set_intervals("consumption", intervals)
-    with patch.object(
-        myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
-    ):
-        await api.async_update(modes=modes)
-        resultat = api.stats["consumption"]
+    api.set_collects("consumption_load_curve", intervals=intervals)
+    await api.async_update_collects()
+    resultat = api.stats["consumption"]
     assert resultat[27]["value"] == 1.296
     assert resultat[28]["value"] == 0.618
     print(resultat)
 
     # Daily
-    dataset = DS_DAILY
-    modes = {"consumption": {"service": "daily_consumption"}}
     api = EnedisByPDL(pdl=PDL, token=TOKEN)
-    api.set_prices("consumption", prices)
-    with patch.object(
-        myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
-    ):
-        await api.async_update(modes=modes)
-        resultat = api.stats["consumption"]
+    api.set_collects("daily_consumption", prices=prices, intervals=intervals)
+    await api.async_update_collects()
+    resultat = api.stats["consumption"]
 
     assert resultat[0]["value"] == 42.045
     print(resultat)
@@ -148,27 +115,23 @@ async def test_with_offpeak() -> None:
 
 @freeze_time("2023-03-01")
 @pytest.mark.asyncio
-async def test_daily_with_offpeak() -> None:
+async def test_daily_with_offpeak(
+    mock_enedis: Mock,  # pylint: disable=unused-argument
+) -> None:
     """Test daily with offpeak."""
     prices: dict[str, Any] = {"standard": {"price": 0.17}, "offpeak": {"price": 0.18}}
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
-    modes = {"consumption": {"service": "daily_consumption"}}
-    dataset = DS_DAILY
     api = EnedisByPDL(pdl=PDL, token=TOKEN)
-    api.set_intervals("consumption", intervals)
-    api.set_prices("consumption", prices)
-    with patch.object(
-        myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
-    ):
-        await api.async_update(modes=modes)
-        resultat = api.stats["consumption"]
+    api.set_collects("daily_consumption", prices=prices, intervals=intervals)
+    await api.async_update_collects()
+    resultat = api.stats["consumption"]
     assert resultat[359]["value"] == 68.68
     print(resultat)
 
 
 @freeze_time("2023-03-01")
 @pytest.mark.asyncio
-async def test_compare() -> None:
+async def test_compare(mock_enedis: Mock) -> None:  # pylint: disable=unused-argument
     """Test details compare."""
     prices: dict[str, Any] = {"standard": {"price": 0.17}, "offpeak": {"price": 0.18}}
     cumsum_value: dict[str, Any] = {
@@ -180,33 +143,37 @@ async def test_compare() -> None:
         "offpeak": {"sum_price": 0},
     }
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
-    dataset = DS_30
-    modes = {"consumption": {"service": "consumption_load_curve"}}
-
     api = EnedisByPDL(pdl=PDL, token=TOKEN)
-    api.set_intervals("consumption", intervals)
-    api.set_prices("consumption", prices)
-    api.set_cumsum("consumption", "value", cumsum_value)
-    api.set_cumsum("consumption", "price", cumsum_price)
-
-    with patch.object(
-        myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
-    ):
-        await api.async_update(modes=modes)
-        resultat1 = api.stats["consumption"]
+    api.set_collects(
+        "consumption_load_curve",
+        prices=prices,
+        intervals=intervals,
+        cum_value=cumsum_value,
+        cum_price=cumsum_price,
+    )
+    await api.async_update()
+    resultat1 = api.stats["consumption"]
 
     print(resultat1)
     sum_value = 0
     for rslt in resultat1:
-        sum_value = sum_value + rslt["value"]
-
+        sum_value += rslt["value"]
     sum_value_1 = resultat1[26]["sum_value"] + resultat1[77]["sum_value"]
     assert round(sum_value, 3) == round(sum_value_1, 3)
-    dataset = DS_COMPARE
+
     with patch.object(
-        myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
+        myelectricaldatapy.Enedis,
+        "async_get_daily_consumption",
+        return_value=DATASET_DAILY_COMPARE,
     ):
-        await api.async_update(modes=modes)
+        api.set_collects(
+            "daily_consumption",
+            prices=prices,
+            intervals=intervals,
+            cum_value=cumsum_value,
+            cum_price=cumsum_price,
+        )
+        await api.async_update(force_refresh=True)
         resultat2 = api.stats["consumption"]
     assert round(sum_value, 3) == resultat2[2]["sum_value"]
     print(resultat2)
@@ -214,30 +181,24 @@ async def test_compare() -> None:
 
 @freeze_time("2023-03-01")
 @pytest.mark.asyncio
-async def test_cumsums() -> None:
+async def test_cumsums(mock_enedis: Mock) -> None:  # pylint: disable=unused-argument
     """Test cummulative summary."""
     prices: dict[str, Any] = {"standard": {"price": 0.17}, "offpeak": {"price": 0.18}}
     cumsum_value: dict[str, Any] = {"standard": 100, "offpeak": 1000}
     cumsum_price: dict[str, Any] = {"standard": 50, "offpeak": 75}
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
-    dataset = DS_30
-    modes = {
-        "consumption": {
-            "service": "consumption_load_curve",
-            "start": dt.strptime("2023-03-01", "%Y-%m-%d"),
-            "end": dt.strptime("2023-03-08", "%Y-%m-%d"),
-        }
-    }
     api = EnedisByPDL(pdl=PDL, token=TOKEN)
-    api.set_intervals("consumption", intervals)
-    api.set_prices("consumption", prices)
-    api.set_cumsum("consumption", "value", cumsum_value)
-    api.set_cumsum("consumption", "price", cumsum_price)
-    with patch.object(
-        myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
-    ):
-        await api.async_update(modes=modes)
-        resultat = api.stats["consumption"]
+    api.set_collects(
+        "consumption_load_curve",
+        start=dt.strptime("2023-03-01", "%Y-%m-%d"),
+        end=dt.strptime("2023-03-08", "%Y-%m-%d"),
+        prices=prices,
+        intervals=intervals,
+        cum_value=cumsum_value,
+        cum_price=cumsum_price,
+    )
+    await api.async_update_collects()
+    resultat = api.stats["consumption"]
     # offpeak
     assert resultat[0]["sum_value"] == resultat[0]["value"] + 1000
     assert resultat[0]["sum_price"] == resultat[0]["price"] + 75
@@ -248,7 +209,7 @@ async def test_cumsums() -> None:
 
 @freeze_time("2023-3-1")
 @pytest.mark.asyncio
-async def test_tempo() -> None:
+async def test_tempo(mock_enedis: Mock) -> None:  # pylint: disable=unused-argument
     """Test tempo pricings."""
     prices: dict[str, Any] = {
         "standard": {
@@ -265,18 +226,16 @@ async def test_tempo() -> None:
     cumsum_value: dict[str, Any] = {"standard": 100, "offpeak": 1000}
     cumsum_price: dict[str, Any] = {"standard": 50, "offpeak": 75}
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
-    dataset = DS_30
-    modes = {"consumption": {"service": "consumption_load_curve"}}
     api = EnedisByPDL(pdl=PDL, token=TOKEN)
-    api.set_intervals("consumption", intervals)
-    api.set_prices("consumption", prices)
-    api.set_cumsum("consumption", "value", cumsum_value)
-    api.set_cumsum("consumption", "price", cumsum_price)
-    with patch.object(
-        myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
-    ), patch.object(myelectricaldatapy.Enedis, "async_get_tempo", return_value=TEMPO):
-        await api.async_update(modes=modes)
-        resultat = api.stats["consumption"]
+    api.set_collects(
+        "consumption_load_curve",
+        prices=prices,
+        intervals=intervals,
+        cum_value=cumsum_value,
+        cum_price=cumsum_price,
+    )
+    await api.async_update_collects()
+    resultat = api.stats["consumption"]
 
     assert resultat[0]["tempo"] == "blue"
     assert resultat[0]["value"] == 1.079
@@ -285,84 +244,49 @@ async def test_tempo() -> None:
     assert api.tempo_day == "blue"
 
     # Check Daily -> compute not possible.
-    dataset = DS_DAILY
-    modes = {"production": {"service": "daily_production"}}
     api = EnedisByPDL(pdl=PDL, token=TOKEN)
-    with patch.object(
-        myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
-    ), patch.object(myelectricaldatapy.Enedis, "async_get_tempo", return_value=TEMPO):
-        await api.async_update(modes=modes)
-        resultat = api.stats["production"]
+    api.set_collects("daily_production", prices=prices, intervals=intervals)
+    await api.async_update_collects()
+    resultat = api.stats.get("production")
     assert resultat[0].get("tempo") is None
 
 
 @freeze_time("2023-03-01")
 @pytest.mark.asyncio
-async def test_standard_offpeak_cumsum() -> None:
+async def test_standard_offpeak_cumsum(
+    mock_enedis: Mock,  # pylint: disable=unused-argument
+) -> None:
     """Test with offpeak and cumsum."""
     prices: dict[str, Any] = {"standard": {"price": 0.5}, "offpeak": {"price": 1}}
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
-    dataset = DS_30
-    modes = {"consumption": {"service": "consumption_load_curve"}}
     api = EnedisByPDL(pdl=PDL, token=TOKEN)
-    api.set_intervals("consumption", intervals)
-    api.set_prices("consumption", prices)
-    with patch.object(
-        myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
-    ):
-        await api.async_update(modes=modes)
-        resultat = api.stats["consumption"]
-
+    api.set_collects("consumption_load_curve", prices=prices, intervals=intervals)
+    await api.async_update_collects()
+    resultat = api.stats["consumption"]
     assert resultat[0]["value"] == 1.079
 
     # Test daily data , check ignore intervals.
-    dataset = DS_DAILY
     api = EnedisByPDL(pdl=PDL, token=TOKEN)
-    api.set_intervals("consumption", intervals)
-    api.set_prices("consumption", prices)
-    with patch.object(
-        myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
-    ):
-        await api.async_update(modes=modes)
-        resultat = api.stats["consumption"]
-
+    api.set_collects("daily_consumption", prices=prices, intervals=intervals)
+    await api.async_update_collects()
+    resultat = api.stats["consumption"]
     assert resultat[0]["price"] == resultat[0]["value"] * 0.5
 
 
 @pytest.mark.asyncio
-async def test_start_date() -> None:
+async def test_start_date(mock_enedis: Mock) -> None:  # pylint: disable=unused-argument
     """Test with start_date."""
-    dataset = DS_DAILY
     api = EnedisByPDL(pdl=PDL, token=TOKEN)
-    modes = {
-        "consumption": {
-            "service": "consumption_load_curve",
-            "start": dt.strptime("2023-3-7", "%Y-%m-%d"),
-        }
-    }
-    with patch.object(
-        myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
-    ), patch.object(
-        myelectricaldatapy.Enedis, "async_valid_access", return_value=ACCESS
-    ):
-        await api.async_update(modes=modes)
-        resultat = api.stats["consumption"]
-
-    print(resultat)
+    api.set_collects(
+        "consumption_load_curve", start=dt.strptime("2023-3-7", "%Y-%m-%d")
+    )
+    await api.async_update_collects()
+    resultat = api.stats["consumption"]
     assert len(resultat) == 0
 
-    dataset = DS_30
-    modes = {
-        "consumption": {
-            "service": "consumption_load_curve",
-            "start": dt.strptime("2023-3-7", "%Y-%m-%d"),
-        }
-    }
-    with patch.object(
-        myelectricaldatapy.auth.EnedisAuth, "request", return_value=dataset
-    ):
-        await api.async_update(modes=modes)
-        resultat = api.stats["consumption"]
-
-    print(resultat)
+    api.set_collects(
+        "consumption_load_curve", start=dt.strptime("2023-3-7", "%Y-%m-%d")
+    )
+    await api.async_update_collects()
+    resultat = api.stats["consumption"]
     assert len(resultat) == 0
