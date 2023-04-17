@@ -117,6 +117,8 @@ class EnedisAnalytics:
                             self.df.loc[(self.df.notes == mode), "price"] = (
                                 self.df.value * price
                             )
+                        else:
+                            self.df.loc[(self.df.notes == mode), "price"] = None
 
             if summary:
                 for note in notes:
