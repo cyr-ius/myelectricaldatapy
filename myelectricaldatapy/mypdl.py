@@ -94,24 +94,32 @@ class EnedisByPDL:
         """Initialize."""
         self._api: Enedis = Enedis(token, session, timeout)
         self.pdl = pdl
-        self._tempo_subs: bool = False
-        self._off_subs: bool = False
+        self._connected: bool = False
         self._ecowatt_subs: bool = False
         self._maxpower_subs: bool = False
-        self.intervals: list[Tuple[str, str]] = []
+        self._off_subs: bool = False
+        self._params: dict[str, dict[str, Any]] = {}
+        self._tempo_subs: bool = False
         self.access: dict[str, Any] = {}
-        self.contract: dict[str, Any] = {}
         self.address: dict[str, Any] = {}
-        self.tempo: dict[str, Any] = {}
+        self.contract: dict[str, Any] = {}
         self.ecowatt: dict[str, Any] = {}
+        self.has_collected: bool = False
+        self.intervals: list[Tuple[str, str]] = []
+        self.last_access: dt = dt.now()
+        self.last_refresh: dt | None = None
         self.max_power: dict[str, Any] = {}
-        self._connected: bool = False
-        self._params: dict[str, dict[str, Any]] = {PRODUCTION: {}, CONSUMPTION: {}}
+        self.tempo: dict[str, Any] = {}
 
     @property
     def is_connected(self) -> bool:
         """Connect state."""
         return self.access.get("valid", False) is True
+
+    @property
+    def is_quota_reached(self) -> bool:
+        """Check quota."""
+        return self.access.get("quota_reached", True) is True
 
     @property
     def has_intervals(self) -> bool:
@@ -145,11 +153,7 @@ class EnedisByPDL:
         """Statistics."""
         stats = {}
         for mode, params in self._params.items():
-            data = (
-                params.get("dataset", {})
-                .get("meter_reading", {})
-                .get("interval_reading", {})
-            )
+            data = params.get("data", {})
             analytics = EnedisAnalytics(data)
             resultat = analytics.get_data_analytics(
                 convertKwh=True,
@@ -166,60 +170,33 @@ class EnedisByPDL:
             stats.update({mode: resultat})
         return stats
 
-    async def async_update(self, modes: dict[str, Any] | None = None) -> None:
-        """Update data.
-
-        modes = {
-            "consumption":{
-                "service":["daily_consumption" | "consumption_load_curve"],
-                start: [date],
-                end: [date]
-            },
-            "production":{
-                "service":["daily_production" | "production_load_curve"],
-                start: [date],
-                end: [date]
-            }
-        }
-        """
-        start = dt.now() - timedelta(days=1095)
-        end = dt.now() + timedelta(days=1)
-        funcs: dict[str, Callable[..., Any]] = {
-            DAILY_PROD: self._api.async_get_daily_production,
-            DETAIL_PROD: self._api.async_get_details_production,
-            DAILY_CONSUM: self._api.async_get_daily_consumption,
-            DETAIL_CONSUM: self._api.async_get_details_consumption,
-        }
-
+    async def async_update(self, force_refresh: bool = False) -> None:
+        """Update data."""
         self.access = await self._api.async_valid_access(self.pdl)
-        self.contract = await self._api.async_get_contract(self.pdl)
-        self.address = await self._api.async_get_address(self.pdl)
-        if self._ecowatt_subs:
-            self.ecowatt = await self._api.async_get_ecowatt(start, end)
-        if self._maxpower_subs:
-            self.max_power = await self._api.async_get_max_power(self.pdl, start, end)
-        if modes:
-            try:
-                validate = MODES_SCH(modes)
-            except vol.Error as error:
-                _LOGGER.error("The format is incorrect. (%s)", error)
-            else:
-                for mode, params in validate.items():
-                    service = params.get(ATTR_SERVICE)
-                    days = 370 if service in [DAILY_PROD, DAILY_CONSUM] else 7
-                    func = funcs[params.get(ATTR_SERVICE)]
-                    dt_start = (
-                        params.get(ATTR_START)
-                        if params.get(ATTR_START)
-                        else dt.now() - timedelta(days=days)
-                    )
-                    dt_end = params.get(ATTR_END) if params.get(ATTR_END) else end
-                    dataset = await func(self.pdl, dt_start, dt_end)
-                    self._params[mode].update(
-                        {"dataset": dataset, ATTR_START: dt_start}
-                    )
-                    if service in [DAILY_CONSUM, DETAIL_CONSUM] and self._tempo_subs:
-                        self.tempo = await self._api.async_get_tempo(dt_start, dt_end)
+        if "last_call" in self.access:
+            d_last_call = dt.strptime(
+                self.access["last_call"], "%Y-%m-%dT%H:%M:%S.%f"
+            ).date()
+            start = dt.now() - timedelta(days=1095)
+            end = dt.now() + timedelta(days=1)
+            if not self.contract or d_last_call != dt.now().date():
+                self.contract = await self._api.async_get_contract(self.pdl)
+            if not self.address or d_last_call != dt.now().date():
+                self.address = await self._api.async_get_address(self.pdl)
+            if self._ecowatt_subs:
+                self.ecowatt = await self._api.async_get_ecowatt(start, end)
+            if self._maxpower_subs:
+                self.max_power = await self._api.async_get_max_power(
+                    self.pdl, start, end
+                )
+            if self._params and (
+                d_last_call != dt.now().date()
+                or self.has_collected is False
+                or force_refresh is True
+            ):
+                await self.async_update_collects()
+                self.last_refresh = dt.now()
+            self.last_access = dt.now()
 
     def tempo_subscription(self, activate: bool = False) -> None:
         """Enable or Disable Tempo Subscription."""
@@ -239,17 +216,13 @@ class EnedisByPDL:
         """Enable or Disable Max power Subscription."""
         self._maxpower_subs = activate is True
 
-    def set_intervals(self, mode: str, intervals: list[Tuple[str, str]]) -> None:
+    def _set_intervals(self, mode: str, intervals: list[Tuple[str, str]]) -> None:
         """Set intervals."""
         if isinstance(intervals, list):
             self.intervals = intervals
             self._params[mode].update({ATTR_INTERVALS: intervals})
 
-    def set_prices(
-        self,
-        mode: str,
-        prices: dict[str, Any],
-    ) -> None:
+    def _set_prices(self, mode: str, prices: dict[str, Any]) -> None:
         """Set intervals.
 
         prices = {
@@ -276,7 +249,7 @@ class EnedisByPDL:
             self.offpeak_subscription(True)
             self._params[mode].update({ATTR_PRICES: validate})
 
-    def set_cumsum(self, mode: str, form: str, cum_sum: dict[str, Any]) -> None:
+    def _set_cumsum(self, mode: str, form: str, cum_sum: dict[str, Any]) -> None:
         """Set cumulative summary.
 
         mode: "production" or "consumption"
@@ -289,3 +262,55 @@ class EnedisByPDL:
             _LOGGER.error("Format is incorrect (%s)", error)
         else:
             self._params[mode].update({f"cum_{form}".lower(): validate})
+
+    def set_collects(
+        self,
+        service: str,
+        start: dt | None = None,
+        end: dt | None = None,
+        intervals: list[Tuple[str, str]] | None = None,
+        prices: dict[str, Any] | None = None,
+        cum_value: dict[str, Any] | None = None,
+        cum_price: dict[str, Any] | None = None,
+    ) -> None:
+        """Set datas collect."""
+        funcs: dict[str, Callable[..., Any]] = {
+            DAILY_PROD: self._api.async_get_daily_production,
+            DETAIL_PROD: self._api.async_get_details_production,
+            DAILY_CONSUM: self._api.async_get_daily_consumption,
+            DETAIL_CONSUM: self._api.async_get_details_consumption,
+        }
+        days = 1095 if service in [DAILY_PROD, DAILY_CONSUM] else 7
+        mode = CONSUMPTION if service in [DAILY_CONSUM, DETAIL_CONSUM] else PRODUCTION
+        func = funcs[service]
+        dt_start = start if start else dt.now() - timedelta(days=days)
+        dt_end = end if end else dt.now() + timedelta(days=1)
+        self._params[mode] = {"func": func, ATTR_START: dt_start, ATTR_END: dt_end}
+        if intervals:
+            self._set_intervals(mode, intervals)
+        if prices:
+            self._set_prices(mode, prices)
+        if cum_value:
+            self._set_cumsum(mode, "value", cum_value)
+        if cum_price:
+            self._set_cumsum(mode, "price", cum_price)
+
+    async def async_update_collects(self) -> None:
+        """Update data to collect."""
+        dataset = {}
+        checked = True
+        self.has_collected = False
+        for mode, _param in self._params.items():
+            start = _param[ATTR_START]
+            end = _param[ATTR_END]
+            if func := _param.get("func"):
+                dataset = await func(self.pdl, start, end)
+                data = dataset.get("meter_reading", {}).get("interval_reading", {})
+                if len(data) != 0:
+                    checked = checked and len(data) != 0
+                    self._params[mode].pop("func")
+                    self._params[mode].update({"data": data})
+                if mode == CONSUMPTION and self._tempo_subs:
+                    self.tempo = await self._api.async_get_tempo(start, end)
+
+        self.has_collected = checked
