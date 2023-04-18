@@ -8,7 +8,7 @@ import pytest
 from freezegun import freeze_time
 
 import myelectricaldatapy
-from myelectricaldatapy import Enedis, EnedisByPDL
+from myelectricaldatapy import Enedis, EnedisByPDL, EnedisException, LimitReached
 
 from .consts import DATASET_30 as DS_30
 from .consts import INVALID_ACCESS, INVALID_ECOWATT
@@ -115,7 +115,6 @@ async def test_force_refresh(
     mock_enedis: Mock,  # pylint: disable=unused-argument
 ) -> None:
     """Test refresh object."""
-
     last_call = dt.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
     access = {
         "valid": True,
@@ -132,4 +131,36 @@ async def test_force_refresh(
         await api.async_update()
         assert api.last_refresh == save_refresh
         await api.async_update(force_refresh=True)
-        assert api.last_refresh != save_refresh
+        assert api.last_refresh == save_refresh
+
+
+@pytest.mark.asyncio
+async def test_exception(
+    mock_enedis: Mock,  # pylint: disable=unused-argument
+) -> None:
+    """Tests raise exception."""
+    with patch.object(
+        myelectricaldatapy.Enedis, "async_valid_access", side_effect=LimitReached()
+    ):
+        api = EnedisByPDL(pdl=PDL, token=TOKEN)
+        api.set_collects("consumption_load_curve")
+        try:
+            await api.async_update()
+        except EnedisException:
+            pass
+        assert api.last_access is not None
+        assert len(api.access) == 0
+
+    with patch.object(
+        myelectricaldatapy.Enedis,
+        "async_get_details_consumption",
+        side_effect=LimitReached(),
+    ):
+        api = EnedisByPDL(pdl=PDL, token=TOKEN)
+        api.set_collects("consumption_load_curve")
+        try:
+            await api.async_update()
+        except LimitReached:
+            pass
+        assert api.last_access is not None
+        assert api.access["valid"] is True

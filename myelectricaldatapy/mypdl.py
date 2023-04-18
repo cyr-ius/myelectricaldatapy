@@ -2,13 +2,14 @@
 from __future__ import annotations
 
 import logging
+from datetime import date
 from datetime import datetime as dt
 from datetime import timedelta
 from typing import Any, Callable, Tuple
 
 import voluptuous as vol
 
-from myelectricaldatapy import Enedis
+from myelectricaldatapy import Enedis, EnedisException
 
 from .analytics import EnedisAnalytics
 from .const import (
@@ -107,7 +108,7 @@ class EnedisByPDL:
         self.has_collected: bool = False
         self.intervals: list[Tuple[str, str]] = []
         self.last_access: dt = dt.now()
-        self.last_refresh: dt | None = None
+        self.last_refresh: date | None = None
         self.max_power: dict[str, Any] = {}
         self.tempo: dict[str, Any] = {}
 
@@ -172,30 +173,35 @@ class EnedisByPDL:
 
     async def async_update(self, force_refresh: bool = False) -> None:
         """Update data."""
-        self.access = await self._api.async_valid_access(self.pdl)
-        if "last_call" in self.access:
-            d_last_call = dt.strptime(
-                self.access["last_call"], "%Y-%m-%dT%H:%M:%S.%f"
-            ).date()
-            start = dt.now() - timedelta(days=1095)
-            end = dt.now() + timedelta(days=1)
-            if not self.contract or d_last_call != dt.now().date():
-                self.contract = await self._api.async_get_contract(self.pdl)
-            if not self.address or d_last_call != dt.now().date():
-                self.address = await self._api.async_get_address(self.pdl)
-            if self._ecowatt_subs:
-                self.ecowatt = await self._api.async_get_ecowatt(start, end)
-            if self._maxpower_subs:
-                self.max_power = await self._api.async_get_max_power(
-                    self.pdl, start, end
-                )
-            if self._params and (
-                d_last_call != dt.now().date()
-                or self.has_collected is False
-                or force_refresh is True
-            ):
-                await self.async_update_collects()
-                self.last_refresh = dt.now()
+        try:
+            self.access = await self._api.async_valid_access(self.pdl)
+        except EnedisException as error:
+            raise error from error
+        else:
+            try:
+                if self.is_quota_reached is False:
+                    start = dt.now() - timedelta(days=1095)
+                    end = dt.now() + timedelta(days=1)
+                    if not self.contract or self.last_refresh != dt.now().date():
+                        self.contract = await self._api.async_get_contract(self.pdl)
+                    if not self.address or self.last_refresh != dt.now().date():
+                        self.address = await self._api.async_get_address(self.pdl)
+                    if self._ecowatt_subs:
+                        self.ecowatt = await self._api.async_get_ecowatt(start, end)
+                    if self._maxpower_subs:
+                        self.max_power = await self._api.async_get_max_power(
+                            self.pdl, start, end
+                        )
+                    if self._params and (
+                        self.last_refresh != dt.now().date()
+                        or self.has_collected is False
+                        or force_refresh is True
+                    ):
+                        await self.async_update_collects()
+                        self.last_refresh = dt.now().date()
+            except EnedisException as error:
+                raise error from error
+        finally:
             self.last_access = dt.now()
 
     def tempo_subscription(self, activate: bool = False) -> None:
