@@ -109,7 +109,7 @@ async def test_force_refresh(
         await api.async_update()
         assert api.last_refresh == save_refresh
         await api.async_update(force_refresh=True)
-        assert api.last_refresh == save_refresh
+        assert api.last_refresh != save_refresh
 
 
 @pytest.mark.asyncio
@@ -118,7 +118,9 @@ async def test_exception(
 ) -> None:
     """Tests raise exception."""
     with patch.object(
-        myelectricaldatapy.Enedis, "async_valid_access", side_effect=LimitReached()
+        myelectricaldatapy.Enedis,
+        "async_valid_access",
+        side_effect=LimitReached(500, {"detail": "Limit reached"}),
     ):
         api = EnedisByPDL(pdl=PDL, token=TOKEN)
         api.set_collects("consumption_load_curve")
@@ -132,13 +134,29 @@ async def test_exception(
     with patch.object(
         myelectricaldatapy.Enedis,
         "async_get_details_consumption",
-        side_effect=LimitReached(),
+        side_effect=LimitReached(500, {"detail": "Limit reached"}),
     ):
         api = EnedisByPDL(pdl=PDL, token=TOKEN)
         api.set_collects("consumption_load_curve")
         try:
             await api.async_update()
         except LimitReached:
+            pass
+        assert api.last_access is not None
+        assert api.access["valid"] is True
+
+    with patch.object(
+        myelectricaldatapy.Enedis,
+        "async_get_details_consumption",
+        side_effect=EnedisException(500, {"detail": "Error"}),
+    ):
+        api = EnedisByPDL(pdl=PDL, token=TOKEN)
+        api.set_collects("consumption_load_curve")
+        api.set_collects("daily_production")
+        try:
+            await api.async_update()
+            await api.async_update()
+        except EnedisException:
             pass
         assert api.last_access is not None
         assert api.access["valid"] is True
