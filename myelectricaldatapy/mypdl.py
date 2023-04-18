@@ -9,7 +9,7 @@ from typing import Any, Callable, Tuple
 
 import voluptuous as vol
 
-from myelectricaldatapy import Enedis, EnedisException
+from myelectricaldatapy import Enedis, EnedisException, LimitReached
 
 from .analytics import EnedisAnalytics
 from .const import (
@@ -119,11 +119,6 @@ class EnedisByPDL:
         return self.access.get("valid", False) is True
 
     @property
-    def is_quota_reached(self) -> bool:
-        """Check quota."""
-        return self.access.get("quota_reached", True) is True
-
-    @property
     def has_intervals(self) -> bool:
         """Intervals exist."""
         return len(self.intervals) > 0
@@ -174,6 +169,8 @@ class EnedisByPDL:
 
     async def async_update(self, force_refresh: bool = False) -> None:
         """Update data."""
+        start = dt.now() - timedelta(days=1095)
+        end = dt.now() + timedelta(days=1)
         if force_refresh or self.last_access.date() != dt.now().date():
             self.contract = {}
             self.address = {}
@@ -182,28 +179,26 @@ class EnedisByPDL:
             self.has_collected = False
         try:
             self.access = await self._api.async_valid_access(self.pdl)
+            if self.access.get("quota_reached", False):
+                detail = self.access.get("information", "Quota reached")
+                raise LimitReached(409, {"detail": detail})
+            if self.is_connected is False:
+                raise EnedisException(200, {"detail": "Api access not valid"})
+            if not self.contract:
+                self.contract = await self._api.async_get_contract(self.pdl)
+            if not self.address:
+                self.address = await self._api.async_get_address(self.pdl)
+            if not self.ecowatt and self._ecowatt_subs:
+                self.ecowatt = await self._api.async_get_ecowatt(start, end)
+            if not self.max_power and self._maxpower_subs:
+                self.max_power = await self._api.async_get_max_power(
+                    self.pdl, start, end
+                )
+            if self.has_parameters and self.has_collected is False:
+                await self.async_update_collects()
+                self.last_refresh = dt.now()
         except EnedisException as error:
             raise error from error
-        else:
-            try:
-                if self.is_quota_reached is False:
-                    start = dt.now() - timedelta(days=1095)
-                    end = dt.now() + timedelta(days=1)
-                    if not self.contract:
-                        self.contract = await self._api.async_get_contract(self.pdl)
-                    if not self.address:
-                        self.address = await self._api.async_get_address(self.pdl)
-                    if not self.ecowatt and self._ecowatt_subs:
-                        self.ecowatt = await self._api.async_get_ecowatt(start, end)
-                    if not self.max_power and self._maxpower_subs:
-                        self.max_power = await self._api.async_get_max_power(
-                            self.pdl, start, end
-                        )
-                    if self.has_parameters and self.has_collected is False:
-                        await self.async_update_collects()
-                        self.last_refresh = dt.now()
-            except EnedisException as error:
-                raise error from error
         finally:
             self.last_access = dt.now()
 
