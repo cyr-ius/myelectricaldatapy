@@ -1,3 +1,7 @@
+"""Test constants."""
+PDL = "01234567890"
+TOKEN = "xxxxxxxxxxxxx"
+
 ACCESS = {
     "valid": True,
     "consent_expiration_date": "2026-01-14T15:32:38",
@@ -8,6 +12,55 @@ ACCESS = {
     "last_call": "2023-03-01T13:58:24.532501",
     "ban": False,
 }
+
+ADDRESS = {
+    "customer": {
+        "customer_id": "-1137954749",
+        "usage_points": [
+            {
+                "usage_point": {
+                    "usage_point_id": "01234567890",
+                    "usage_point_status": "com",
+                    "meter_type": "AMM",
+                    "usage_point_addresses": {
+                        "street": "1 rue du",
+                        "locality": None,
+                        "postal_code": "00666",
+                        "insee_code": "12345",
+                        "city": "XX YY",
+                        "country": "France",
+                        "geo_points": {},
+                    },
+                }
+            }
+        ],
+    }
+}
+
+CONTRACT = {
+    "customer": {
+        "customer_id": "-1137954749",
+        "usage_points": [
+            {
+                "usage_point": {
+                    "usage_point_id": "01234567890",
+                    "usage_point_status": "com",
+                    "meter_type": "AMM",
+                },
+                "contracts": {
+                    "segment": "C5",
+                    "subscribed_power": "9 kVA",
+                    "last_activation_date": "2006-05-24+02:00",
+                    "distribution_tariff": "BTINFMUDT",
+                    "offpeak_hours": "HC (1H30-8H00;12H30-14H00)",
+                    "contract_status": "SERVC",
+                    "last_distribution_tariff_change_date": "2019-09-13+02:00",
+                },
+            }
+        ],
+    }
+}
+
 
 INVALID_ACCESS = {
     "valid": False,
@@ -90,7 +143,7 @@ ECOWATT = {
 
 DATASET_30 = {
     "meter_reading": {
-        "usage_point_id": "09171201102829",
+        "usage_point_id": "01234567890",
         "start": "2023-03-01",
         "end": "2023-03-08",
         "quality": "BRUT",
@@ -970,7 +1023,7 @@ DATASET_30 = {
 
 DATASET_DAILY_COMPARE = {
     "meter_reading": {
-        "usage_point_id": "012345",
+        "usage_point_id": "01234567890",
         "start": "2022-03-08",
         "end": "2023-03-08",
         "quality": "BRUT",
@@ -990,7 +1043,7 @@ DATASET_DAILY_COMPARE = {
 
 DATASET_DAILY = {
     "meter_reading": {
-        "usage_point_id": "012345",
+        "usage_point_id": "01234567890",
         "start": "2022-03-08",
         "end": "2023-03-08",
         "quality": "BRUT",

@@ -6,7 +6,7 @@ import pytest
 
 import myelectricaldatapy
 
-from .consts import ACCESS, DATASET_30, DATASET_DAILY, ECOWATT, TEMPO
+from .consts import ACCESS, ADDRESS, CONTRACT, DATASET_30, DATASET_DAILY, ECOWATT, TEMPO
 
 
 @pytest.fixture(name="mock_enedis")
@@ -27,9 +27,9 @@ def mock_enedis() -> Generator[AsyncMock, None, None]:
     ), patch.object(
         myelectricaldatapy.Enedis, "async_valid_access", return_value=ACCESS
     ), patch.object(
-        myelectricaldatapy.Enedis, "async_get_contract", return_value={}
+        myelectricaldatapy.Enedis, "async_get_contract", return_value=CONTRACT
     ), patch.object(
-        myelectricaldatapy.Enedis, "async_get_address", return_value={}
+        myelectricaldatapy.Enedis, "async_get_address", return_value=ADDRESS
     ), patch.object(
         myelectricaldatapy.Enedis, "async_get_tempo", return_value=TEMPO
     ), patch.object(

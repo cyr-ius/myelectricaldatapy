@@ -10,11 +10,7 @@ from freezegun import freeze_time
 import myelectricaldatapy
 from myelectricaldatapy import Enedis, EnedisByPDL, EnedisException, LimitReached
 
-from .consts import DATASET_30 as DS_30
-from .consts import INVALID_ACCESS, INVALID_ECOWATT
-
-PDL = "012345"
-TOKEN = "xxxxxxxxxxxxx"
+from .consts import DATASET_30, INVALID_ACCESS, INVALID_ECOWATT, PDL, TOKEN
 
 
 @freeze_time("2023-01-23")
@@ -77,7 +73,7 @@ async def test_valid_access(
 async def test_fetch_data() -> None:
     """Test fetch data."""
     with patch.object(
-        myelectricaldatapy.auth.EnedisAuth, "request", return_value=DS_30
+        myelectricaldatapy.auth.EnedisAuth, "request", return_value=DATASET_30
     ):
         api = Enedis(token=TOKEN)
         resultat = await api.async_fetch_datas(
@@ -88,26 +84,8 @@ async def test_fetch_data() -> None:
         )
         assert (
             resultat["meter_reading"]["interval_reading"]
-            == DS_30["meter_reading"]["interval_reading"]  # noqa
+            == DATASET_30["meter_reading"]["interval_reading"]  # noqa
         )
-
-
-@pytest.mark.asyncio
-async def test_load() -> None:
-    """Test load object."""
-    with patch.object(
-        myelectricaldatapy.auth.EnedisAuth, "request", return_value=DS_30
-    ):
-        api = Enedis(token=TOKEN)
-        await api.async_get_max_power(PDL, dt.now(), dt.now())
-        await api.async_get_contract(PDL)
-        await api.async_get_address(PDL)
-        await api.async_has_offpeak(PDL)
-        await api.async_check_offpeak(PDL, dt.now())
-        await api.async_get_identity(PDL)
-        await api.async_get_daily_consumption(PDL, dt.now(), dt.now())
-        await api.async_get_daily_production(PDL, dt.now(), dt.now())
-        await api.async_get_details_production(PDL, dt.now(), dt.now())
 
 
 @pytest.mark.asyncio

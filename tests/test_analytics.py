@@ -11,10 +11,7 @@ from freezegun import freeze_time
 import myelectricaldatapy
 from myelectricaldatapy import EnedisByPDL
 
-from .consts import DATASET_DAILY_COMPARE
-
-PDL = "012345"
-TOKEN = "xxxxxxxxxxxxx"
+from .consts import DATASET_DAILY_COMPARE, PDL, TOKEN
 
 
 @freeze_time("2023-03-01")
@@ -290,3 +287,22 @@ async def test_start_date(mock_enedis: Mock) -> None:  # pylint: disable=unused-
     await api.async_update_collects()
     resultat = api.stats["consumption"]
     assert len(resultat) == 0
+
+
+@freeze_time("2023-3-1")
+@pytest.mark.asyncio
+async def test_twice_call(
+    mock_enedis: Mock,  # pylint: disable=unused-argument
+) -> None:
+    """Tests raise exception."""
+    intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
+    api = EnedisByPDL(pdl=PDL, token=TOKEN)
+    api.set_collects("consumption_load_curve", intervals=intervals)
+    api.set_collects("daily_production")
+    await api.async_update()
+    assert len(api.stats["consumption"]) != 0
+    assert len(api.stats["production"]) != 0
+    assert api.stats["consumption"][0]["notes"] == "offpeak"
+    assert api.stats["production"][0]["notes"] == "standard"
+    await api.async_update()
+    assert api.last_access is not None
