@@ -106,6 +106,7 @@ class EnedisByPDL:
         self.contract: dict[str, Any] = {}
         self.ecowatt: dict[str, Any] = {}
         self.has_collected: bool = False
+        self.has_parameters: bool = False
         self.intervals: list[Tuple[str, str]] = []
         self.last_access: dt = dt.now()
         self.last_refresh: date | None = None
@@ -173,6 +174,12 @@ class EnedisByPDL:
 
     async def async_update(self, force_refresh: bool = False) -> None:
         """Update data."""
+        if force_refresh or self.last_access.date() != dt.now().date():
+            self.contract = {}
+            self.address = {}
+            self.ecowatt = {}
+            self.max_power = {}
+            self.has_collected = False
         try:
             self.access = await self._api.async_valid_access(self.pdl)
         except EnedisException as error:
@@ -182,23 +189,19 @@ class EnedisByPDL:
                 if self.is_quota_reached is False:
                     start = dt.now() - timedelta(days=1095)
                     end = dt.now() + timedelta(days=1)
-                    if not self.contract or self.last_refresh != dt.now().date():
+                    if not self.contract:
                         self.contract = await self._api.async_get_contract(self.pdl)
-                    if not self.address or self.last_refresh != dt.now().date():
+                    if not self.address:
                         self.address = await self._api.async_get_address(self.pdl)
-                    if self._ecowatt_subs:
+                    if not self.ecowatt and self._ecowatt_subs:
                         self.ecowatt = await self._api.async_get_ecowatt(start, end)
-                    if self._maxpower_subs:
+                    if not self.max_power and self._maxpower_subs:
                         self.max_power = await self._api.async_get_max_power(
                             self.pdl, start, end
                         )
-                    if self._params and (
-                        self.last_refresh != dt.now().date()
-                        or self.has_collected is False
-                        or force_refresh is True
-                    ):
+                    if self.has_parameters and self.has_collected is False:
                         await self.async_update_collects()
-                        self.last_refresh = dt.now().date()
+                        self.last_refresh = dt.now()
             except EnedisException as error:
                 raise error from error
         finally:
@@ -279,7 +282,7 @@ class EnedisByPDL:
         cum_value: dict[str, Any] | None = None,
         cum_price: dict[str, Any] | None = None,
     ) -> None:
-        """Set datas collect."""
+        """Set parameters for data collect."""
         funcs: dict[str, Callable[..., Any]] = {
             DAILY_PROD: self._api.async_get_daily_production,
             DETAIL_PROD: self._api.async_get_details_production,
@@ -300,21 +303,25 @@ class EnedisByPDL:
             self._set_cumsum(mode, "value", cum_value)
         if cum_price:
             self._set_cumsum(mode, "price", cum_price)
+        self.has_parameters = True
 
     async def async_update_collects(self) -> None:
         """Update data to collect."""
-        dataset = {}
         checked = True
         self.has_collected = False
         for mode, _param in self._params.items():
+            dataset = {}
             start = _param[ATTR_START]
             end = _param[ATTR_END]
             if func := _param.get("func"):
-                dataset = await func(self.pdl, start, end)
+                try:
+                    dataset = await func(self.pdl, start, end)
+                except EnedisException as error:
+                    checked = False
+                    _LOGGER.error(error.args[1]["detail"])
                 data = dataset.get("meter_reading", {}).get("interval_reading", {})
                 if len(data) != 0:
                     checked = checked and len(data) != 0
-                    self._params[mode].pop("func")
                     self._params[mode].update({"data": data})
                 if mode == CONSUMPTION and self._tempo_subs:
                     self.tempo = await self._api.async_get_tempo(start, end)
