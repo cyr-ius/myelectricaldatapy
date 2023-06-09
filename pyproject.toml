@@ -1,3 +1,42 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name        = "myelectricaldatapy"
+version     = "replace_by_workflow"
+license     = {text = "GPL-3"}
+description = "Fetch Linky data from myelectricaldata.fr"
+readme      = "README.md"
+authors     = [
+    {name = "Cyr-ius", email = "cyr-ius@ipocus.net"}
+]
+keywords    = ["enedis", "linky", "async", "myelectricaldata"]
+classifiers = [
+    "Programming Language :: Python",
+    "Development Status :: 5 - Production/Stable",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Framework :: AsyncIO",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Topic :: Home Automation",
+]
+requires-python = ">=3.10.0"
+dependencies    = [
+    "aiohttp>=3.8.1",
+    "pandas==1.4.3",
+    "voluptuous==0.13.1",
+]
+
+[tool.setuptools]
+platforms = ["any"]
+zip-safe  = false
+include-package-data = true
+
 [tool.isort]
 # https://github.com/PyCQA/isort/wiki/isort-Settings
 profile = "black"
