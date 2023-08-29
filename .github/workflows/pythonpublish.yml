@@ -38,9 +38,4 @@ jobs:
           python -m build
 
       - name: 🚀 Publish to PyPi
-        shell: bash
-        env:
-          TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-        run: |
-          twine upload dist/*
+        uses: pypa/gh-action-pypi-publish@release/v1
