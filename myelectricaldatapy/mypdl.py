@@ -311,6 +311,8 @@ class EnedisByPDL:
             if func := _param.get("func"):
                 try:
                     dataset = await func(self.pdl, start, end)
+                    if dataset is None:
+                        raise EnedisException("Data collect is empty")
                 except EnedisException as error:
                     checked = False
                     _LOGGER.error(error.args[1]["detail"])
