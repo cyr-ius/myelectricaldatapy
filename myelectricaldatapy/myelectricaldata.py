@@ -79,7 +79,7 @@ class Enedis:
         return await self.async_fetch_datas("contracts", pdl)
 
     async def async_get_address(self, pdl: str) -> Any:
-        """Return adress information."""
+        """Return address information."""
         address = {}
         addresses = await self.async_fetch_datas("addresses", pdl)
         usage_points = addresses.get("customer", {}).get("usage_points", "")
@@ -89,8 +89,8 @@ class Enedis:
         return address
 
     async def async_get_addresses(self, pdl: str) -> Any:
-        """Return all adresses information."""
-        return await self.async_fetch_datas("adresses", pdl)
+        """Return all addresses information."""
+        return await self.async_fetch_datas("addresses", pdl)
 
     async def async_get_tempo(
         self, start: dt | None = None, end: dt | None = None
