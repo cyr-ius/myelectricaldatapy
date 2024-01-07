@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools","setuptools-scm", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -31,6 +31,8 @@ dependencies    = [
     "pandas==2.0.2",
     "voluptuous==0.13.1",
 ]
+
+[tool.setuptools_scm]
 
 [tool.setuptools]
 platforms = ["any"]
