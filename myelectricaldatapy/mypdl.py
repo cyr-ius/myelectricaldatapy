@@ -124,7 +124,7 @@ class EnedisByPDL:
         return len(self.intervals) > 0
 
     @property
-    def ecowatt_day(self) -> dict[str, Any]:
+    def ecowatt_day(self) -> Any:
         """ecowatt."""
         str_date = dt.now().strftime("%Y-%m-%d")
         return self.ecowatt.get(str_date, {})

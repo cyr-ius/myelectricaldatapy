@@ -17,11 +17,11 @@ $ git clone https://github.com/cyr-ius/myelectricaldatapy.git
 $ python setup.py install
 ```
 
-## Attributs
+## Attributes
 
 - tempo_day : RED/WHITE/BLUE
 - ecowatt : Information Dictionary
-- power_datas: Datas
+- power_Data: Data
 
 ## Methods
 
@@ -30,7 +30,7 @@ $ python setup.py install
 - async_get_details_consumption (start: datetime, end: datetime) Return: details consumption (max 7days)
 - async_get_daily_production (day: datetime, end: datetime) Return: production (max 1095 days)
 - async_get_daily_consumption (start: datetime, end: datetime) Return: consumption (max 1095 days)
-- async_get_identity Return: datas identity
+- async_get_identity Return: Data identity
 - async_check_offpeak (start: datetime) : check if datetime in range offpeak
 - async_has_offpeak Return boolean if offpeak detected
 - async_get_ecowatt Return: ecowatt information
@@ -38,8 +38,8 @@ $ python setup.py install
 - async_get_address Return address
 - async_get_contract Return contact
 - async_valid_access Return information access from mylelectricaldata
-- async_load (start: datetime, end: datetime) Return None - Load datas in power_datas attribut
-- async_refresh Return None - Refresh power_datas , tempo_day and ecowatt attributs.
+- async_load (start: datetime, end: datetime) Return None - Load Data in power_Data attribute
+- async_refresh Return None - Refresh power_Data , tempo_day and ecowatt attributes.
 
 ## Get started
 
@@ -58,16 +58,16 @@ async def main():
 
     start = datetime.now() - timedelta(days=7)
     end = datetime.now()
-    datas = await api.async_get_details_consumption(start,end)
-    print(datas)
+    Data = await api.async_get_details_consumption(start,end)
+    print(Data)
 
-    analytics = EnedisAnalytics(datas)
+    analytics = EnedisAnalytics(Data)
     offpeak_intervals = [(dt.strptime("08H00", "%HH%M"), dt.strptime("12H00", "%HH%M"))]
 
-    # it is possible to load detailed production and consumption data within the object (in the power_datas attribute)
+    # it is possible to load detailed production and consumption data within the object (in the power_Data attribute)
     await api.async_load()
-    print(api.power_datas)
-    # and refresh datas load.
+    print(api.power_Data)
+    # and refresh Data load.
     await api.async_refresh()
 
     # Analytics data convert

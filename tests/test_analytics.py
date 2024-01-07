@@ -91,7 +91,7 @@ async def test_with_offpeak(
     assert resultat[0].get("sum_value") == 1.079
     print(resultat)
 
-    # Whitout price
+    # Without price
     api = EnedisByPDL(pdl=PDL, token=TOKEN)
     api.set_collects("consumption_load_curve", intervals=intervals)
     await api.async_update_collects()
@@ -179,7 +179,7 @@ async def test_compare(mock_enedis: Mock) -> None:  # pylint: disable=unused-arg
 @freeze_time("2023-03-01")
 @pytest.mark.asyncio
 async def test_cumsums(mock_enedis: Mock) -> None:  # pylint: disable=unused-argument
-    """Test cummulative summary."""
+    """Test cumulative summary."""
     prices: dict[str, Any] = {"standard": {"price": 0.17}, "offpeak": {"price": 0.18}}
     cumsum_value: dict[str, Any] = {"standard": 100, "offpeak": 1000}
     cumsum_price: dict[str, Any] = {"standard": 50, "offpeak": 75}

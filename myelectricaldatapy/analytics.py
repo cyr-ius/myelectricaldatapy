@@ -36,7 +36,7 @@ class EnedisAnalytics:
         prices: dict[str, Any] | None = None,
         tempo: dict[str, str] | None = None,
     ) -> Any:
-        """Convert datas to analyze."""
+        """Convert data to analyze."""
         step_hour = False
         if not self.df.empty:
             # Convert str to datetime
@@ -48,7 +48,7 @@ class EnedisAnalytics:
                     self.df.date, utc=True, format="%Y-%m-%d %H:%M:%S"
                 )
 
-            # Substract 1 minute at hour
+            # Subtract 1 minute at hour
             # because Pandas considers hour as the next hour while
             # for Enedis it is the hour before
             if "interval_length" in self.df:
@@ -110,9 +110,7 @@ class EnedisAnalytics:
                             self.df.loc[
                                 (self.df.notes == mode) & (self.df.tempo == offset),
                                 "price",
-                            ] = (
-                                self.df.value * price
-                            )
+                            ] = self.df.value * price
                         elif offset == "price":
                             self.df.loc[(self.df.notes == mode), "price"] = (
                                 self.df.value * price
@@ -140,12 +138,12 @@ class EnedisAnalytics:
             return int(rslt[0]) / 60
         return 1
 
-    def _get_data_interval(self, intervalls: list[Tuple[str, str]]) -> pd.DataFrame:
+    def _get_data_interval(self, intervals: list[Tuple[str, str]]) -> pd.DataFrame:
         """Group date from range time."""
-        for intervall in intervalls:
+        for interval in intervals:
             # Convert str to datetime
-            start = pd.to_datetime(intervall[0], format="%H:%M:%S").time()
-            end = pd.to_datetime(intervall[1], format="%H:%M:%S").time()
+            start = pd.to_datetime(interval[0], format="%H:%M:%S").time()
+            end = pd.to_datetime(interval[1], format="%H:%M:%S").time()
             # Mark
             self.df.loc[
                 (self.df.date.dt.time > start) & (self.df.date.dt.time <= end),
