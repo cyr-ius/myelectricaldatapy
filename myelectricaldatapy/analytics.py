@@ -1,10 +1,9 @@
 """Class for analytics."""
 from __future__ import annotations
 
+from datetime import datetime as dt, timedelta
 import logging
 import re
-from datetime import datetime as dt
-from datetime import timedelta
 from typing import Any, Collection, Tuple
 
 import pandas as pd
@@ -40,7 +39,10 @@ class EnedisAnalytics:
         step_hour = False
         if not self.df.empty:
             # Convert str to datetime
-            self.df.date = pd.to_datetime(self.df.date, format="%Y-%m-%d %H:%M:%S")
+            try:
+                self.df.date = pd.to_datetime(self.df.date, format="%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                self.df.date = pd.to_datetime(self.df.date, format="%Y-%m-%d")
             self.df.date = self.df.date.dt.tz_localize(self.local_timezone)
 
             if convertUTC:
