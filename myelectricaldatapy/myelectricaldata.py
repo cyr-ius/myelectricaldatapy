@@ -1,4 +1,5 @@
 """Class for Enedis Gateway (http://www.myelectricaldata.fr)."""
+
 from __future__ import annotations
 
 import logging

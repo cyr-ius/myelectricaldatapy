@@ -1,4 +1,5 @@
 """Tests  Enedis api."""
+
 from __future__ import annotations
 
 from datetime import datetime as dt
