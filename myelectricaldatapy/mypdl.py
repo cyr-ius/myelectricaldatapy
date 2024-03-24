@@ -1,4 +1,5 @@
 """Class for my PDL."""
+
 from __future__ import annotations
 
 import logging

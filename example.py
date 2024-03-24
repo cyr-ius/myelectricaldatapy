@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-""" Example code."""
+"""Example code."""
 
 import asyncio
 import logging

@@ -1,6 +1,7 @@
 # -*- coding:utf-8 -*-
 
 """myelectricaldatapy package."""
+
 from .exceptions import (
     EnedisException,
     HttpRequestError,

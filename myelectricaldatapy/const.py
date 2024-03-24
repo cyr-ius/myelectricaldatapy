@@ -1,4 +1,5 @@
 """Constants."""
+
 ATTR_CUM_PRICE = "cum_price"
 ATTR_CUM_VALUE = "cum_value"
 ATTR_END = "end"
