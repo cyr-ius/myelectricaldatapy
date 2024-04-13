@@ -183,18 +183,30 @@ class EnedisByPDL:
             if self.access.get("quota_reached", False):
                 detail = self.access.get("information", "Quota reached")
                 raise LimitReached(409, {"detail": detail})
+
             if self.is_connected is False:
                 raise EnedisException(200, {"detail": "Api access not valid"})
+
             if not self.contract:
-                self.contract = await self._api.async_get_contract(self.pdl)
+                try:
+                    self.contract = await self._api.async_get_contract(self.pdl)
+                except EnedisException as error:
+                    _LOGGER.warning(error)
+
             if not self.address:
-                self.address = await self._api.async_get_address(self.pdl)
+                try:
+                    self.address = await self._api.async_get_address(self.pdl)
+                except EnedisException as error:
+                    _LOGGER.warning(error)
+
             if not self.ecowatt and self._ecowatt_subs:
                 self.ecowatt = await self._api.async_get_ecowatt(start, end)
+
             if not self.max_power and self._maxpower_subs:
                 self.max_power = await self._api.async_get_max_power(
                     self.pdl, start, end
                 )
+
             if self.has_parameters and self.has_collected is False:
                 await self.async_update_collects()
                 self.last_refresh = dt.now()
