@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date, datetime as dt, timedelta
 import logging
-from datetime import date
-from datetime import datetime as dt
-from datetime import timedelta
 from typing import Any, Callable, Tuple
 
 import voluptuous as vol
@@ -324,7 +322,7 @@ class EnedisByPDL:
             if func := _param.get("func"):
                 try:
                     dataset = await func(self.pdl, start, end)
-                    if dataset is None:
+                    if dataset is None or dataset.get("meter_reading") is None:
                         raise EnedisException("Data collect is empty")
                 except EnedisException as error:
                     checked = False
