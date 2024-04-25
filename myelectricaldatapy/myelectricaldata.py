@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
+from datetime import date, datetime as dt, timedelta
 import logging
 import re
-from datetime import date
-from datetime import datetime as dt
-from datetime import timedelta
 from types import TracebackType
-from typing import Any
+from typing import Any, Generator, cast
 
 from .auth import EnedisAuth
 from .const import DAILY_CONSUM, DAILY_PROD, DETAIL_CONSUM, DETAIL_PROD, TIMEOUT
@@ -152,11 +150,47 @@ class Enedis:
 
     async def async_get_details_consumption(self, pdl: str, start: dt, end: dt) -> Any:
         """Get consumption details. (max: 7 days)."""
-        return await self.async_fetch_datas(DETAIL_CONSUM, pdl, start, end)
+        data = None
+        for interval in list(self.date_range(start, end, 7)):
+            start, end = interval
+            try:
+                rsp = await self.async_fetch_datas(DETAIL_CONSUM, pdl, start, end)
+            finally:
+                if (
+                    rsp is None
+                    or rsp.get("meter_reading", {}).get("interval_reading") is None
+                ):
+                    continue
+                elif data is None:
+                    data = cast(dict[str, Any], rsp)
+                else:
+                    data["meter_reading"]["interval_reading"].extend(
+                        rsp.get("meter_reading", {}).get("interval_reading")
+                    )
+
+        return data
 
     async def async_get_details_production(self, pdl: str, start: dt, end: dt) -> Any:
         """Get production details. (max: 7 days)."""
-        return await self.async_fetch_datas(DETAIL_PROD, pdl, start, end)
+        data = None
+        for interval in list(self.date_range(start, end, 7)):
+            start, end = interval
+            try:
+                rsp = await self.async_fetch_datas(DETAIL_PROD, pdl, start, end)
+            finally:
+                if (
+                    rsp is None
+                    or rsp.get("meter_reading", {}).get("interval_reading") is None
+                ):
+                    continue
+                elif data is None:
+                    data = cast(dict[str, Any], rsp)
+                else:
+                    data["meter_reading"]["interval_reading"].extend(
+                        rsp.get("meter_reading", {}).get("interval_reading")
+                    )
+
+        return data
 
     async def async_get_max_power(self, pdl: str, start: dt, end: dt) -> Any:
         """Get consumption max power."""
@@ -180,3 +214,16 @@ class Enedis:
     async def close(self) -> None:
         """Close the session."""
         await self.auth.async_close()
+
+    @staticmethod
+    def date_range(start: dt, end: dt, intv: int) -> Generator[tuple[dt, dt], dt, None]:
+        """Return range by interval date."""
+        diff = (
+            (end - start).days // intv
+            if (end - start).days % intv == 0
+            else ((end - start).days // intv) + 1
+        )
+        for i in range(1, diff):
+            yield (start, start + timedelta(days=intv))
+            start = start + timedelta(days=(intv + 1))
+        yield (start, end)
