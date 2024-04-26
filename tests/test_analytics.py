@@ -6,8 +6,8 @@ from datetime import datetime as dt
 from typing import Any
 from unittest.mock import Mock, patch
 
-import pytest
 from freezegun import freeze_time
+import pytest
 
 import myelectricaldatapy
 from myelectricaldatapy import EnedisByPDL
@@ -203,6 +203,28 @@ async def test_cumsums(mock_enedis: Mock) -> None:  # pylint: disable=unused-arg
     # standard
     assert resultat[27]["sum_value"] == resultat[27]["value"] + 100
     assert resultat[27]["sum_price"] == resultat[27]["price"] + 50
+
+
+@freeze_time("2023-03-01")
+@pytest.mark.asyncio
+async def test_extra_date(mock_enedis: Mock) -> None:  # pylint: disable=unused-argument
+    """Test cumulative summary."""
+    prices: dict[str, Any] = {"standard": {"price": 0.17}, "offpeak": {"price": 0.18}}
+    intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
+    api = EnedisByPDL(pdl=PDL, token=TOKEN)
+    api.set_collects(
+        "consumption_load_curve",
+        start=dt.strptime("2023-03-01", "%Y-%m-%d"),
+        end=dt.strptime("2023-03-28", "%Y-%m-%d"),
+        prices=prices,
+        intervals=intervals,
+    )
+    await api.async_update_collects()
+    resultat = api.stats["consumption"]
+    # offpeak
+    assert resultat[0]["sum_value"] is not None
+    # standard
+    assert resultat[27]["sum_value"] is not None
 
 
 @freeze_time("2023-3-1")
