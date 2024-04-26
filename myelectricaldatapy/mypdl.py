@@ -327,9 +327,9 @@ class EnedisByPDL:
                 except EnedisException as error:
                     checked = False
                     _LOGGER.error(error.args[1]["detail"])
-                data = dataset.get("meter_reading", {}).get("interval_reading", {})
-                if len(data) != 0:
-                    checked = checked and len(data) != 0
+                data = dataset.get("meter_reading", {}).get("interval_reading", [])
+                if len(data) > 0:
+                    checked = checked and len(data) > 0
                     self._params[mode].update({"data": data})
                 if mode == CONSUMPTION and self._tempo_subs:
                     self.tempo = await self._api.async_get_tempo(start, end)
