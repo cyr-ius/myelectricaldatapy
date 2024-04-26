@@ -224,6 +224,7 @@ class Enedis:
             else ((end - start).days // intv) + 1
         )
         for i in range(1, diff):
-            yield (start, start + timedelta(days=intv))
-            start = start + timedelta(days=(intv + 1))
+            s_end = start + timedelta(days=intv)
+            yield (start, s_end)
+            start = s_end
         yield (start, end)
