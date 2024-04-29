@@ -185,13 +185,13 @@ class EnedisByPDL:
             if self.is_connected is False:
                 raise EnedisException(200, {"detail": "Api access not valid"})
 
-            if not self.contract:
+            if not self.contract and self.has_collected is False:
                 try:
                     self.contract = await self._api.async_get_contract(self.pdl)
                 except EnedisException as error:
                     _LOGGER.warning(error)
 
-            if not self.address:
+            if not self.address and self.has_collected is False:
                 try:
                     self.address = await self._api.async_get_address(self.pdl)
                 except EnedisException as error:
