@@ -10,6 +10,7 @@ from typing import Any, Generator, cast
 
 from .auth import EnedisAuth
 from .const import DAILY_CONSUM, DAILY_PROD, DETAIL_CONSUM, DETAIL_PROD, TIMEOUT
+from .exceptions import EnedisException
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -150,53 +151,38 @@ class Enedis:
 
     async def async_get_details_consumption(self, pdl: str, start: dt, end: dt) -> Any:
         """Get consumption details. (max: 7 days)."""
-        data = None
-        for interval in list(self.date_range(start, end, 7)):
-            start, end = interval
-            try:
-                rsp = await self.async_fetch_datas(DETAIL_CONSUM, pdl, start, end)
-            finally:
-                if (
-                    rsp is None
-                    or rsp.get("meter_reading", {}).get("interval_reading") is None
-                ):
-                    continue
-                elif data is None:
-                    data = cast(dict[str, Any], rsp)
-                else:
-                    data["meter_reading"]["interval_reading"].extend(
-                        rsp.get("meter_reading", {}).get("interval_reading")
-                    )
-
-        return data
+        return self._async_get_details(DETAIL_CONSUM, pdl, start, end)
 
     async def async_get_details_production(self, pdl: str, start: dt, end: dt) -> Any:
         """Get production details. (max: 7 days)."""
-        data = None
-        for interval in list(self.date_range(start, end, 7)):
-            start, end = interval
-            try:
-                rsp = await self.async_fetch_datas(DETAIL_PROD, pdl, start, end)
-            finally:
-                if (
-                    rsp is None
-                    or rsp.get("meter_reading", {}).get("interval_reading") is None
-                ):
-                    continue
-                elif data is None:
-                    data = cast(dict[str, Any], rsp)
-                else:
-                    data["meter_reading"]["interval_reading"].extend(
-                        rsp.get("meter_reading", {}).get("interval_reading")
-                    )
-
-        return data
+        return self._async_get_details(DETAIL_PROD, pdl, start, end)
 
     async def async_get_max_power(self, pdl: str, start: dt, end: dt) -> Any:
         """Get consumption max power."""
         return await self.async_fetch_datas(
             "daily_consumption_max_power", pdl, start, end
         )
+
+    async def _async_get_details(self, mode: str, pdl: str, start: dt, end: dt) -> Any:
+        """Get production details. (max: 7 days)."""
+        data = None
+        response = {}
+        for interval in list(self.date_range(start, end, 7)):
+            start, end = interval
+            try:
+                response = await self.async_fetch_datas(mode, pdl, start, end)
+            except EnedisException as error:
+                raise error from error
+            finally:
+                new_data = response.get("meter_reading", {}).get("interval_reading")
+                if response is None or new_data is None:
+                    continue
+                elif data is None:
+                    data = cast(dict[str, Any], response)
+                else:
+                    data["meter_reading"]["interval_reading"].extend(new_data)
+
+        return data
 
     async def __aenter__(self) -> Enedis:
         """Asynchronous enter."""
