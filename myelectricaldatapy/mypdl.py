@@ -6,6 +6,7 @@ from datetime import date, datetime as dt, timedelta
 import logging
 from typing import Any, Callable, Tuple
 
+from aiohttp import ClientSession
 import voluptuous as vol
 
 from myelectricaldatapy import Enedis, EnedisException, LimitReached
@@ -88,7 +89,7 @@ class EnedisByPDL:
         self,
         pdl: str,
         token: str,
-        session: Any | None = None,
+        session: ClientSession = ClientSession(),
         timeout: int = TIMEOUT,
     ) -> None:
         """Initialize."""

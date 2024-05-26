@@ -5,8 +5,9 @@ from __future__ import annotations
 from datetime import date, datetime as dt, timedelta
 import logging
 import re
-from types import TracebackType
 from typing import Any, Generator, cast
+
+from aiohttp import ClientSession
 
 from .auth import EnedisAuth
 from .const import DAILY_CONSUM, DAILY_PROD, DETAIL_CONSUM, DETAIL_PROD, TIMEOUT
@@ -19,10 +20,14 @@ class Enedis:
     """Get data of pdl."""
 
     def __init__(
-        self, token: str, session: Any | None = None, timeout: int = TIMEOUT
+        self,
+        token: str,
+        session: ClientSession = ClientSession(),
+        timeout: int = TIMEOUT,
     ) -> None:
         """Initialize."""
-        self.auth = EnedisAuth(token, session, timeout)
+        self.auth = EnedisAuth(session, token, timeout)
+        self.async_request = self.auth.async_request
         self.offpeaks: list[str] = []
         self.dt_offpeak: list[dt] = []
         self.last_access: date | None = None
@@ -44,7 +49,7 @@ class Enedis:
             end_date = end.strftime("%Y-%m-%d")
             path_range = f"/start/{start_date}/end/{end_date}"
         path = f"{service}/{pdl}{path_range}"
-        return await self.auth.request(path=path)
+        return await self.async_request(path=path)
 
     async def async_valid_access(self, pdl: str) -> Any:
         """Return valid access."""
@@ -104,7 +109,7 @@ class Enedis:
             if end
             else (dt.now() + timedelta(days=1)).strftime("%Y-%m-%d")
         )
-        return await self.auth.request(path=f"rte/tempo/{str_start}/{str_end}")
+        return await self.auth.async_request(path=f"rte/tempo/{str_start}/{str_end}")
 
     async def async_get_ecowatt(
         self, start: dt | None = None, end: dt | None = None
@@ -118,7 +123,7 @@ class Enedis:
             if end
             else (dt.now() + timedelta(days=1)).strftime("%Y-%m-%d")
         )
-        return await self.auth.request(path=f"rte/ecowatt/{str_start}/{str_end}")
+        return await self.async_request(path=f"rte/ecowatt/{str_start}/{str_end}")
 
     async def async_has_offpeak(self, pdl: str) -> bool:
         """Has offpeak hours."""
@@ -151,11 +156,11 @@ class Enedis:
 
     async def async_get_details_consumption(self, pdl: str, start: dt, end: dt) -> Any:
         """Get consumption details. (max: 7 days)."""
-        return self._async_get_details(DETAIL_CONSUM, pdl, start, end)
+        return await self._async_get_details(DETAIL_CONSUM, pdl, start, end)
 
     async def async_get_details_production(self, pdl: str, start: dt, end: dt) -> Any:
         """Get production details. (max: 7 days)."""
-        return self._async_get_details(DETAIL_PROD, pdl, start, end)
+        return await self._async_get_details(DETAIL_PROD, pdl, start, end)
 
     async def async_get_max_power(self, pdl: str, start: dt, end: dt) -> Any:
         """Get consumption max power."""
@@ -167,12 +172,15 @@ class Enedis:
         """Get production details. (max: 7 days)."""
         data = None
         response = {}
+        raise_error = False
         for interval in list(self.date_range(start, end, 7)):
             start, end = interval
             try:
-                response = await self.async_fetch_datas(mode, pdl, start, end)
+                if raise_error is False:
+                    response = await self.async_fetch_datas(mode, pdl, start, end)
             except EnedisException as error:
-                raise error from error
+                raise_error = True
+                _LOGGER.error(error)
             finally:
                 new_data = response.get("meter_reading", {}).get("interval_reading")
                 if response is None or new_data is None:
@@ -183,23 +191,6 @@ class Enedis:
                     data["meter_reading"]["interval_reading"].extend(new_data)
 
         return data
-
-    async def __aenter__(self) -> Enedis:
-        """Asynchronous enter."""
-        return self
-
-    async def __aexit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> None:
-        """Asynchronous exit."""
-        await self.close()
-
-    async def close(self) -> None:
-        """Close the session."""
-        await self.auth.async_close()
 
     @staticmethod
     def date_range(start: dt, end: dt, intv: int) -> Generator[tuple[dt, dt], dt, None]:
@@ -214,3 +205,16 @@ class Enedis:
             yield (start, s_end)
             start = s_end
         yield (start, end)
+
+    async def __aenter__(self) -> Enedis:
+        """Asynchronous enter."""
+        return self
+
+    async def __aexit__(self, *_exc_info: object) -> None:
+        """Async exit."""
+        await self.async_close()
+
+    async def async_close(self) -> None:
+        """Close the session."""
+        if self.auth.session:
+            await self.auth.session.close()

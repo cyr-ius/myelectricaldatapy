@@ -9,7 +9,6 @@ import socket
 from typing import Any
 
 from aiohttp import ClientError, ClientResponseError, ClientSession
-import async_timeout
 
 from .const import TIMEOUT, URL
 from .exceptions import (
@@ -26,46 +25,37 @@ class EnedisAuth:
     """Class for Enedis Auth API."""
 
     def __init__(
-        self, token: str, session: ClientSession | None = None, timeout: int = TIMEOUT
+        self, session: ClientSession, token: str, timeout: int = TIMEOUT
     ) -> None:
         """Init."""
         self.token = token
         self.timeout = timeout
-        self.session = session if session else ClientSession()
+        self.session = session
 
-    async def async_close(self) -> None:
-        """Close session."""
-        await self.session.close()
-
-    async def request(self, path: str, method: str = "GET", **kwargs: Any) -> Any:
+    async def async_request(self, path: str, method: str = "get", **kwargs: Any) -> Any:
         """Request session."""
-        url = f"{URL}/{path}"
-        if headers := kwargs.get("headers", {}):
-            headers = dict(headers)
-
-        headers.update(
+        kwargs.setdefault("headers", {})
+        kwargs["headers"].update(
             {"Content-Type": "application/json", "Authorization": self.token}
         )
 
         try:
-            async with async_timeout.timeout(TIMEOUT):
-                _LOGGER.debug("Request %s (%s)", url, kwargs)
-                response = await self.session.request(
-                    method, url, **kwargs, headers=headers, raise_for_status=True
-                )
+            async with asyncio.timeout(self.timeout):
+                _LOGGER.debug("Request: %s (%s) - %s", path, method, kwargs.get("json"))
+                response = await self.session.request(method, f"{URL}/{path}", **kwargs)
+                contents = await response.read()
+                response.raise_for_status()
         except (asyncio.CancelledError, asyncio.TimeoutError) as error:
             raise TimeoutExceededError(
                 "Timeout occurred while connecting to MyElectricalData."
             ) from error
         except ClientResponseError:
-            contents = await response.read()
-            response.close()
             message = contents.decode("utf8")
-            if response.headers.get("Content-Type", "") == "application/json":
+            if "application/json" in response.headers.get("Content-Type", ""):
                 if response.status == 409:
-                    raise LimitReached(response.status, json.loads(message))
-                raise EnedisException(response.status, json.loads(message))
-            raise EnedisException(response.status, {"message": message})
+                    raise LimitReached(json.loads(message))
+                raise EnedisException(json.loads(message))
+            raise EnedisException({"message": message})
         except (ClientError, socket.gaierror) as error:
             raise HttpRequestError(
                 "Error occurred while communicating with MyElectricalData."
