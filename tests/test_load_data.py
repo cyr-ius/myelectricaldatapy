@@ -86,7 +86,7 @@ async def test_invalid_access(
 async def test_fetch_data(mock_detail) -> None:
     """Test fetch data."""
     with patch.object(
-        myelectricaldatapy.auth.EnedisAuth, "request", return_value=mock_detail
+        myelectricaldatapy.auth.EnedisAuth, "async_request", return_value=mock_detail
     ):
         api = Enedis(token=TOKEN)
         resultat = await api.async_fetch_datas(

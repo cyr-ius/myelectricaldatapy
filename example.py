@@ -2,8 +2,10 @@
 """Example code."""
 
 import asyncio
-import logging
 from datetime import datetime, timedelta
+import logging
+
+import yaml
 
 from myelectricaldatapy import Enedis, EnedisByPDL, EnedisException
 
@@ -15,12 +17,16 @@ formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(messag
 ch.setFormatter(formatter)
 logger.addHandler(ch)
 
-# Please , fill good values...
-PDL = "0123456789"
-TOKEN = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+# Fill out the secrets in secrets.yaml, you can find an example
+# _secrets.yaml file, which has to be renamed after filling out the secrets.
+with open("./secrets.yaml", encoding="UTF-8") as file:
+    secrets = yaml.safe_load(file)
+
+TOKEN = secrets["TOKEN"]
+PDL = secrets["PDL"]
 
 
-async def main() -> None:
+async def async_main() -> None:
     """Main function."""
 
     api = Enedis(token=TOKEN)
@@ -37,10 +43,16 @@ async def main() -> None:
     except EnedisException as error:
         logger.error(error)
 
+    await api.async_close()
+
     myPdl = EnedisByPDL(PDL, TOKEN)
-    await myPdl.async_update()
-    print(myPdl.stats)
+    try:
+        await myPdl.async_update()
+        logger.info(myPdl.stats)
+    except EnedisException as error:
+        logger.error(error)
 
 
-loop = asyncio.get_event_loop()
-loop.run_until_complete(main())
+if __name__ == "__main__":
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(async_main())
