@@ -110,5 +110,5 @@ dmypy.json
 #pyannotate
 type_info.json
 
-#perso
-test_home.py
+# Secret files
+secrets.yaml
