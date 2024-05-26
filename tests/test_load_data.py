@@ -5,13 +5,13 @@ from __future__ import annotations
 from datetime import datetime as dt
 from unittest.mock import Mock, patch
 
-import pytest
 from freezegun import freeze_time
+import pytest
 
 import myelectricaldatapy
 from myelectricaldatapy import Enedis, EnedisByPDL, EnedisException, LimitReached
 
-from .consts import DATASET_30, INVALID_ACCESS, INVALID_ECOWATT, PDL, TOKEN
+from .consts import PDL, TOKEN
 
 
 @freeze_time("2023-01-23")
@@ -27,9 +27,15 @@ async def test_ecowatt(mock_enedis: Mock) -> None:  # pylint: disable=unused-arg
     await mypdl.async_update()
     assert mypdl.ecowatt_day["message"] == "Pas d’alerte."
 
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mock_ecowatt", [True], indirect=True)
+async def test_invalid_ecowatt(mock_enedis: Mock, mock_ecowatt: bool) -> None:
+    """Test ecowatt."""
     with patch.object(
-        myelectricaldatapy.Enedis, "async_get_ecowatt", return_value=INVALID_ECOWATT
+        myelectricaldatapy.Enedis, "async_get_ecowatt", return_value=mock_ecowatt
     ):
+        api = Enedis(token=TOKEN)
         resultat = await api.async_get_ecowatt()
         assert resultat.get("2023-01-22") is None
 
@@ -51,9 +57,7 @@ async def test_tempoday(mock_enedis: Mock) -> None:  # pylint: disable=unused-ar
 
 
 @pytest.mark.asyncio
-async def test_valid_access(
-    mock_enedis: Mock,  # pylint: disable=unused-argument
-) -> None:
+async def test_valid_access(mock_enedis: Mock) -> None:  # pylint: disable=unused-argument
     """Test access."""
     api = Enedis(token=TOKEN)
     resultat = await api.async_valid_access(PDL)
@@ -62,8 +66,16 @@ async def test_valid_access(
     resultat = await api.async_has_access(PDL)
     assert resultat is True
 
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mock_access", [True], indirect=True)
+async def test_invalid_access(
+    mock_enedis: Mock,
+    mock_access: bool,  # pylint: disable=unused-argument
+) -> None:
+    """Test access."""
     with patch.object(
-        myelectricaldatapy.Enedis, "async_valid_access", return_value=INVALID_ACCESS
+        myelectricaldatapy.Enedis, "async_valid_access", return_value=mock_access
     ):
         api = Enedis(token=TOKEN)
         resultat = await api.async_valid_access(PDL)
@@ -71,10 +83,10 @@ async def test_valid_access(
 
 
 @pytest.mark.asyncio
-async def test_fetch_data() -> None:
+async def test_fetch_data(mock_detail) -> None:
     """Test fetch data."""
     with patch.object(
-        myelectricaldatapy.auth.EnedisAuth, "request", return_value=DATASET_30
+        myelectricaldatapy.auth.EnedisAuth, "request", return_value=mock_detail
     ):
         api = Enedis(token=TOKEN)
         resultat = await api.async_fetch_datas(
@@ -85,7 +97,7 @@ async def test_fetch_data() -> None:
         )
         assert (
             resultat["meter_reading"]["interval_reading"]
-            == DATASET_30["meter_reading"]["interval_reading"]  # noqa
+            == mock_detail["meter_reading"]["interval_reading"]  # noqa
         )
 
 

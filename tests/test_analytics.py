@@ -10,9 +10,9 @@ from freezegun import freeze_time
 import pytest
 
 import myelectricaldatapy
-from myelectricaldatapy import EnedisByPDL
+from myelectricaldatapy import EnedisByPDL, LimitReached
 
-from .consts import DATASET_DAILY_COMPARE, PDL, TOKEN
+from .consts import PDL, TOKEN
 
 
 @freeze_time("2023-03-01")
@@ -159,10 +159,30 @@ async def test_compare(mock_enedis: Mock) -> None:  # pylint: disable=unused-arg
     sum_value_1 = resultat1[26]["sum_value"] + resultat1[77]["sum_value"]
     assert round(sum_value, 3) == round(sum_value_1, 3)
 
+    daily_comsumption = {
+        "meter_reading": {
+            "usage_point_id": "01234567890",
+            "start": "2022-03-08",
+            "end": "2023-03-08",
+            "quality": "BRUT",
+            "reading_type": {
+                "measurement_kind": "energy",
+                "measuring_period": "P1D",
+                "unit": "Wh",
+                "aggregate": "sum",
+            },
+            "interval_reading": [
+                {"value": "77559", "date": "2023-03-01"},
+                {"value": "68680", "date": "2023-03-02"},
+                {"value": "81972", "date": "2023-03-03"},
+            ],
+        }
+    }
+
     with patch.object(
         myelectricaldatapy.Enedis,
         "async_get_daily_consumption",
-        return_value=DATASET_DAILY_COMPARE,
+        return_value=daily_comsumption,
     ):
         api.set_collects(
             "daily_consumption",
@@ -207,7 +227,7 @@ async def test_cumsums(mock_enedis: Mock) -> None:  # pylint: disable=unused-arg
 
 @freeze_time("2023-03-01")
 @pytest.mark.asyncio
-async def test_extra_date(mock_enedis: Mock) -> None:  # pylint: disable=unused-argument
+async def test_extra_date(mock_base: Mock, mock_detail) -> None:  # pylint: disable=unused-argument
     """Test cumulative summary."""
     prices: dict[str, Any] = {"standard": {"price": 0.17}, "offpeak": {"price": 0.18}}
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
@@ -219,12 +239,28 @@ async def test_extra_date(mock_enedis: Mock) -> None:  # pylint: disable=unused-
         prices=prices,
         intervals=intervals,
     )
-    await api.async_update_collects()
+    with patch("myelectricaldatapy.Enedis.async_fetch_datas", return_value=mock_detail):
+        await api.async_update_collects()
     resultat = api.stats["consumption"]
     # offpeak
     assert resultat[0]["sum_value"] is not None
     # standard
     assert resultat[27]["sum_value"] is not None
+
+    api.set_collects(
+        "consumption_load_curve",
+        start=dt.strptime("2023-03-01", "%Y-%m-%d"),
+        end=dt.strptime("2023-03-28", "%Y-%m-%d"),
+        prices=prices,
+        intervals=intervals,
+    )
+    with patch(
+        "myelectricaldatapy.Enedis.async_fetch_datas",
+        side_effect=[mock_detail, LimitReached(500, {"detail": "Limit reached"})],
+    ):
+        await api.async_update_collects()
+        resultat = api.stats["consumption"]
+        assert resultat[0]["sum_value"] is not None
 
 
 @freeze_time("2023-3-1")

@@ -1,0 +1,23 @@
+{
+  "customer": {
+    "customer_id": "-1137954749",
+    "usage_points": [
+      {
+        "usage_point": {
+          "usage_point_id": "01234567890",
+          "usage_point_status": "com",
+          "meter_type": "AMM"
+        },
+        "contracts": {
+          "segment": "C5",
+          "subscribed_power": "9 kVA",
+          "last_activation_date": "2006-05-24+02:00",
+          "distribution_tariff": "BTINFMUDT",
+          "offpeak_hours": "HC (1H30-8H00;12H30-14H00)",
+          "contract_status": "SERVC",
+          "last_distribution_tariff_change_date": "2019-09-13+02:00"
+        }
+      }
+    ]
+  }
+}

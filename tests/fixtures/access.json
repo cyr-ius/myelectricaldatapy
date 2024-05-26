@@ -1,0 +1,10 @@
+{
+  "valid": true,
+  "consent_expiration_date": "2026-01-14T15:32:38",
+  "call_number": 7,
+  "quota_reached": false,
+  "quota_limit": 50,
+  "quota_reset_at": "2023-03-01T23:59:59.999999",
+  "last_call": "2023-03-01T13:58:24.532501",
+  "ban": false
+}

@@ -1,0 +1,23 @@
+{
+  "customer": {
+    "customer_id": "-123456789",
+    "usage_points": [
+      {
+        "usage_point": {
+          "usage_point_id": "01234567890",
+          "usage_point_status": "com",
+          "meter_type": "AMM",
+          "usage_point_addresses": {
+            "street": "1 rue paul bismuth",
+            "locality": null,
+            "postal_code": "00666",
+            "insee_code": "12345",
+            "city": "XX YY",
+            "country": "France",
+            "geo_points": {}
+          }
+        }
+      }
+    ]
+  }
+}
