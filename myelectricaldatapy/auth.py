@@ -8,8 +8,8 @@ import logging
 import socket
 from typing import Any
 
+from aiohttp import ClientError, ClientResponseError, ClientSession
 import async_timeout
-from aiohttp import ClientError, ClientSession
 
 from .const import TIMEOUT, URL
 from .exceptions import (
@@ -57,28 +57,22 @@ class EnedisAuth:
             raise TimeoutExceededError(
                 "Timeout occurred while connecting to MyElectricalData."
             ) from error
+        except ClientResponseError:
+            contents = await response.read()
+            response.close()
+            message = contents.decode("utf8")
+            if response.headers.get("Content-Type", "") == "application/json":
+                if response.status == 409:
+                    raise LimitReached(response.status, json.loads(message))
+                raise EnedisException(response.status, json.loads(message))
+            raise EnedisException(response.status, {"message": message})
         except (ClientError, socket.gaierror) as error:
             raise HttpRequestError(
                 "Error occurred while communicating with MyElectricalData."
             ) from error
 
-        content_type = response.headers.get("Content-Type", "")
-        if response.status // 100 in [4, 5]:
-            contents = await response.read()
-            response.close()
-
-            message = contents.decode("utf8")
-            if content_type == "application/json":
-                if response.status == 409:
-                    raise LimitReached(response.status, json.loads(message))
-                raise EnedisException(response.status, json.loads(message))
-            raise EnedisException(response.status, {"message": message})
-
-        if "application/json" in content_type:
-            rslt = await response.json()
-            _LOGGER.debug("Response %s", rslt)
-            return rslt
-
-        rslt = await response.text()
-        _LOGGER.debug("Response %s", rslt)
-        return rslt
+        return (
+            await response.json()
+            if "application/json" in response.headers.get("Content-Type", "")
+            else await response.text()
+        )
