@@ -51,7 +51,7 @@ class EnedisAuth:
             async with async_timeout.timeout(TIMEOUT):
                 _LOGGER.debug("Request %s (%s)", url, kwargs)
                 response = await self.session.request(
-                    method, url, **kwargs, headers=headers
+                    method, url, **kwargs, headers=headers, raise_for_status=True
                 )
         except (asyncio.CancelledError, asyncio.TimeoutError) as error:
             raise TimeoutExceededError(
