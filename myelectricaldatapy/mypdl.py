@@ -16,6 +16,7 @@ from .const import (
     ATTR_CUM_PRICE,
     ATTR_CUM_VALUE,
     ATTR_END,
+    ATTR_FN,
     ATTR_INTERVALS,
     ATTR_OFFPEAK,
     ATTR_PRICES,
@@ -301,7 +302,7 @@ class EnedisByPDL:
         func = funcs[service]
         dt_start = start if start else dt.now() - timedelta(days=days)
         dt_end = end if end else dt.now() + timedelta(days=1)
-        self._params[mode] = {"func": func, ATTR_START: dt_start, ATTR_END: dt_end}
+        self._params[mode] = {ATTR_FN: func, ATTR_START: dt_start, ATTR_END: dt_end}
         if intervals:
             self._set_intervals(mode, intervals)
         if prices:
@@ -316,23 +317,24 @@ class EnedisByPDL:
         """Update data to collect."""
         checked = True
         self.has_collected = False
-        for mode, _param in self._params.items():
+        for mode, attr in self._params.items():
             dataset = {}
-            start = _param[ATTR_START]
-            end = _param[ATTR_END]
-            if func := _param.get("func"):
-                try:
-                    dataset = await func(self.pdl, start, end)
-                    if dataset is None or dataset.get("meter_reading") is None:
-                        raise EnedisException("Data collect is empty")
-                except EnedisException as error:
-                    checked = False
-                    _LOGGER.error(error.args[1]["detail"])
+            start = attr[ATTR_START]
+            end = attr[ATTR_END]
+            fn = attr[ATTR_FN]
+            try:
+                dataset = await fn(self.pdl, start, end)
+            except EnedisException as error:
+                checked = False
+                _LOGGER.error(error)
+            else:
                 data = dataset.get("meter_reading", {}).get("interval_reading", [])
-                if len(data) > 0:
-                    checked = checked and len(data) > 0
-                    self._params[mode].update({"data": data})
-                if mode == CONSUMPTION and self._tempo_subs:
-                    self.tempo = await self._api.async_get_tempo(start, end)
+                if len(data) == 0:
+                    raise EnedisException("Data collection is empty")
+                checked = checked and len(data) > 0
+                self._params[mode].update({"data": data})
+
+            if mode == CONSUMPTION and self._tempo_subs:
+                self.tempo = await self._api.async_get_tempo(start, end)
 
         self.has_collected = checked
