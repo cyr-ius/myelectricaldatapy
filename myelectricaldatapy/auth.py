@@ -52,9 +52,10 @@ class EnedisAuth:
         except ClientResponseError:
             message = contents.decode("utf8")
             if "application/json" in response.headers.get("Content-Type", ""):
+                msg = json.loads(message)
                 if response.status == 409:
-                    raise LimitReached(json.loads(message))
-                raise EnedisException(json.loads(message))
+                    raise LimitReached(msg.get("detail", msg))
+                raise EnedisException(msg.get("detail", msg))
             raise EnedisException({"message": message})
         except (ClientError, socket.gaierror) as error:
             raise HttpRequestError(
