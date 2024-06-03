@@ -328,6 +328,8 @@ class EnedisByPDL:
                 checked = False
                 _LOGGER.error(error)
             else:
+                if dataset is None:
+                    raise EnedisException("Data collection is empty")
                 data = dataset.get("meter_reading", {}).get("interval_reading", [])
                 if len(data) == 0:
                     raise EnedisException("Data collection is empty")
