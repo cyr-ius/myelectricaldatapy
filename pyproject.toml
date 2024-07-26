@@ -7,7 +7,6 @@ name        = "myelectricaldatapy"
 dynamic     = ["version"]
 license     = {text = "GPL-3"}
 description = "Fetch Linky data from myelectricaldata.fr"
-url         = "https://github.com/cyr-ius/myelectricaldatapy"
 readme      = "README.md"
 authors     = [
     {name = "Cyr-ius", email = "cyr-ius@ipocus.net"}
@@ -31,6 +30,9 @@ dependencies    = [
     "pandas>=2.0.2",
     "voluptuous>=0.13.1",
 ]
+
+[project.urls]
+Homepage = "https://github.com/cyr-ius/myelectricaldatapy"
 
 [tool.setuptools_scm]
 
