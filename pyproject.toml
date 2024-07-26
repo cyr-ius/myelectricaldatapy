@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name        = "myelectricaldatapy"
-dynamic = ["version"]
+dynamic     = ["version"]
 license     = {text = "GPL-3"}
 description = "Fetch Linky data from myelectricaldata.fr"
 url         = "https://github.com/cyr-ius/myelectricaldatapy"
