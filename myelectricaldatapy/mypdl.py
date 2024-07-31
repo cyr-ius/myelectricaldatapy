@@ -90,10 +90,11 @@ class EnedisByPDL:
         self,
         pdl: str,
         token: str,
-        session: ClientSession = ClientSession(),
+        session: ClientSession | None = None,
         timeout: int = TIMEOUT,
     ) -> None:
         """Initialize."""
+        session = ClientSession() if session is None else session
         self._api: Enedis = Enedis(token, session, timeout)
         self.pdl = pdl
         self._connected: bool = False
@@ -340,3 +341,12 @@ class EnedisByPDL:
                 self.tempo = await self._api.async_get_tempo(start, end)
 
         self.has_collected = checked
+
+    async def __aexit__(self, *_exc_info: object) -> None:
+        """Async exit."""
+        await self.async_close()
+
+    async def async_close(self) -> None:
+        """Close the session."""
+        if self._api.auth.session:
+            await self._api.auth.session.close()

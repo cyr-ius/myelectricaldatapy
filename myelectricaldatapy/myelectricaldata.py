@@ -20,12 +20,10 @@ class Enedis:
     """Get data of pdl."""
 
     def __init__(
-        self,
-        token: str,
-        session: ClientSession = ClientSession(),
-        timeout: int = TIMEOUT,
+        self, token: str, session: ClientSession | None = None, timeout: int = TIMEOUT
     ) -> None:
         """Initialize."""
+        session = ClientSession() if session is None else session
         self.auth = EnedisAuth(session, token, timeout)
         self.async_request = self.auth.async_request
         self.offpeaks: list[str] = []
