@@ -52,7 +52,10 @@ async def async_main() -> None:
     except EnedisException as error:
         logger.error(error)
 
+    await myPdl.async_close()
+
 
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(async_main())
+    asyncio.set_event_loop(loop)
+    asyncio.run(async_main())
