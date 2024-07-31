@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime as dt
 from unittest.mock import Mock, patch
 
+from aiohttp import ClientSession
 from freezegun import freeze_time
 import pytest
 
@@ -15,40 +16,37 @@ from .consts import PDL, TOKEN
 
 
 @freeze_time("2023-01-23")
-@pytest.mark.asyncio
 async def test_ecowatt(mock_enedis: Mock) -> None:  # pylint: disable=unused-argument
     """Test get ecowatt."""
-    api = Enedis(token=TOKEN)
+    api = Enedis(token=TOKEN, session=ClientSession())
     resultat = await api.async_get_ecowatt()
     assert resultat["2023-01-22"]["value"] == 1
 
-    mypdl = EnedisByPDL(pdl=PDL, token=TOKEN)
+    mypdl = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
     mypdl.ecowatt_subscription(True)
     await mypdl.async_update()
     assert mypdl.ecowatt_day["message"] == "Pas d’alerte."
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("mock_ecowatt", [True], indirect=True)
 async def test_invalid_ecowatt(mock_enedis: Mock, mock_ecowatt: bool) -> None:
     """Test ecowatt."""
     with patch.object(
         myelectricaldatapy.Enedis, "async_get_ecowatt", return_value=mock_ecowatt
     ):
-        api = Enedis(token=TOKEN)
+        api = Enedis(token=TOKEN, session=ClientSession())
         resultat = await api.async_get_ecowatt()
         assert resultat.get("2023-01-22") is None
 
 
 @freeze_time("2023-3-3")
-@pytest.mark.asyncio
 async def test_tempoday(mock_enedis: Mock) -> None:  # pylint: disable=unused-argument
     """Test get tempo day."""
-    api = Enedis(token=TOKEN)
+    api = Enedis(token=TOKEN, session=ClientSession())
     resultat = await api.async_get_tempo()
     assert resultat["2023-3-1"] == "blue"
 
-    mypdl = EnedisByPDL(pdl=PDL, token=TOKEN)
+    mypdl = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
     mypdl.set_collects("consumption_load_curve")
     mypdl.tempo_subscription(True)
     await mypdl.async_update()
@@ -56,10 +54,9 @@ async def test_tempoday(mock_enedis: Mock) -> None:  # pylint: disable=unused-ar
     assert mypdl.tempo_day == "blue"
 
 
-@pytest.mark.asyncio
 async def test_valid_access(mock_enedis: Mock) -> None:  # pylint: disable=unused-argument
     """Test access."""
-    api = Enedis(token=TOKEN)
+    api = Enedis(token=TOKEN, session=ClientSession())
     resultat = await api.async_valid_access(PDL)
     assert resultat["valid"] is True
 
@@ -67,7 +64,6 @@ async def test_valid_access(mock_enedis: Mock) -> None:  # pylint: disable=unuse
     assert resultat is True
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("mock_access", [True], indirect=True)
 async def test_invalid_access(
     mock_enedis: Mock,
@@ -77,18 +73,17 @@ async def test_invalid_access(
     with patch.object(
         myelectricaldatapy.Enedis, "async_valid_access", return_value=mock_access
     ):
-        api = Enedis(token=TOKEN)
+        api = Enedis(token=TOKEN, session=ClientSession())
         resultat = await api.async_valid_access(PDL)
         assert resultat["quota_reached"] is True
 
 
-@pytest.mark.asyncio
 async def test_fetch_data(mock_detail) -> None:
     """Test fetch data."""
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "async_request", return_value=mock_detail
     ):
-        api = Enedis(token=TOKEN)
+        api = Enedis(token=TOKEN, session=ClientSession())
         resultat = await api.async_fetch_datas(
             service="comsumption_load_curve",
             pdl=PDL,
@@ -101,7 +96,6 @@ async def test_fetch_data(mock_detail) -> None:
         )
 
 
-@pytest.mark.asyncio
 async def test_force_refresh(
     mock_enedis: Mock,  # pylint: disable=unused-argument
 ) -> None:
@@ -115,7 +109,7 @@ async def test_force_refresh(
     with patch.object(
         myelectricaldatapy.Enedis, "async_valid_access", return_value=access
     ):
-        api = EnedisByPDL(pdl=PDL, token=TOKEN)
+        api = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
         api.set_collects("consumption_load_curve")
         await api.async_update()
         save_refresh = api.last_refresh
@@ -125,7 +119,6 @@ async def test_force_refresh(
         assert api.last_refresh != save_refresh
 
 
-@pytest.mark.asyncio
 async def test_exception(
     mock_enedis: Mock,  # pylint: disable=unused-argument
 ) -> None:
@@ -135,7 +128,7 @@ async def test_exception(
         "async_valid_access",
         side_effect=LimitReached(500, {"detail": "Limit reached"}),
     ):
-        api = EnedisByPDL(pdl=PDL, token=TOKEN)
+        api = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
         api.set_collects("consumption_load_curve")
         try:
             await api.async_update()
@@ -149,7 +142,7 @@ async def test_exception(
         "async_get_details_consumption",
         side_effect=LimitReached(500, {"detail": "Limit reached"}),
     ):
-        api = EnedisByPDL(pdl=PDL, token=TOKEN)
+        api = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
         api.set_collects("consumption_load_curve")
         try:
             await api.async_update()
@@ -163,7 +156,7 @@ async def test_exception(
         "async_get_details_consumption",
         side_effect=EnedisException(500, {"detail": "Error"}),
     ):
-        api = EnedisByPDL(pdl=PDL, token=TOKEN)
+        api = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
         api.set_collects("consumption_load_curve")
         api.set_collects("daily_production")
         try:

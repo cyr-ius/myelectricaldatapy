@@ -1,5 +1,7 @@
 """Test helpers for MyElectricalData."""
 
+from __future__ import annotations
+
 from collections.abc import Generator
 import json
 from typing import Any
@@ -7,9 +9,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-import myelectricaldatapy
-
-from . import load_fixture
+from tests import load_fixture
 
 
 @pytest.fixture(name="mock_detail")
@@ -66,35 +66,37 @@ def mock_enedis(
     """Mock a successful connection."""
 
     with (
-        patch.object(
-            myelectricaldatapy.Enedis,
-            "async_get_daily_consumption",
+        patch(
+            "myelectricaldatapy.Enedis.async_get_daily_consumption",
             return_value=mock_daily,
         ),
-        patch.object(
-            myelectricaldatapy.Enedis,
-            "async_get_daily_production",
+        patch(
+            "myelectricaldatapy.Enedis.async_get_daily_production",
             return_value=mock_daily,
         ),
-        patch.object(
-            myelectricaldatapy.Enedis,
-            "async_get_details_consumption",
+        patch(
+            "myelectricaldatapy.Enedis.async_get_details_consumption",
             return_value=mock_detail,
         ),
-        patch.object(
-            myelectricaldatapy.Enedis, "async_valid_access", return_value=mock_access
+        patch(
+            "myelectricaldatapy.Enedis.async_valid_access",
+            return_value=mock_access,
         ),
-        patch.object(
-            myelectricaldatapy.Enedis, "async_get_contract", return_value=mock_contract
+        patch(
+            "myelectricaldatapy.Enedis.async_get_contract",
+            return_value=mock_contract,
         ),
-        patch.object(
-            myelectricaldatapy.Enedis, "async_get_address", return_value=mock_address
+        patch(
+            "myelectricaldatapy.Enedis.async_get_address",
+            return_value=mock_address,
         ),
-        patch.object(
-            myelectricaldatapy.Enedis, "async_get_tempo", return_value=mock_tempo
+        patch(
+            "myelectricaldatapy.Enedis.async_get_tempo",
+            return_value=mock_tempo,
         ),
-        patch.object(
-            myelectricaldatapy.Enedis, "async_get_ecowatt", return_value=mock_ecowatt
+        patch(
+            "myelectricaldatapy.Enedis.async_get_ecowatt",
+            return_value=mock_ecowatt,
         ),
     ):
         yield AsyncMock()
@@ -106,20 +108,25 @@ def mock_base(
 ) -> Generator[AsyncMock, None, None]:
     """Mock a successful connection."""
     with (
-        patch.object(
-            myelectricaldatapy.Enedis, "async_valid_access", return_value=mock_access
+        patch(
+            "myelectricaldatapy.Enedis.async_valid_access",
+            return_value=mock_access,
         ),
-        patch.object(
-            myelectricaldatapy.Enedis, "async_get_contract", return_value=mock_contract
+        patch(
+            "myelectricaldatapy.Enedis.async_get_contract",
+            return_value=mock_contract,
         ),
-        patch.object(
-            myelectricaldatapy.Enedis, "async_get_address", return_value=mock_address
+        patch(
+            "myelectricaldatapy.Enedis.async_get_address",
+            return_value=mock_address,
         ),
-        patch.object(
-            myelectricaldatapy.Enedis, "async_get_tempo", return_value=mock_tempo
+        patch(
+            "myelectricaldatapy.Enedis.async_get_tempo",
+            return_value=mock_tempo,
         ),
-        patch.object(
-            myelectricaldatapy.Enedis, "async_get_ecowatt", return_value=mock_ecowatt
+        patch(
+            "myelectricaldatapy.Enedis.async_get_ecowatt",
+            return_value=mock_ecowatt,
         ),
     ):
         yield AsyncMock()

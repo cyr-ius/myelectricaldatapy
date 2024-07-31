@@ -6,6 +6,7 @@ from datetime import datetime as dt
 from typing import Any
 from unittest.mock import Mock, patch
 
+from aiohttp import ClientSession
 from freezegun import freeze_time
 import pytest
 
@@ -16,10 +17,9 @@ from .consts import PDL, TOKEN
 
 
 @freeze_time("2023-03-01")
-@pytest.mark.asyncio
 async def test_compute(mock_enedis: Mock) -> None:  # pylint: disable=unused-argument
     """Test standard."""
-    api = EnedisByPDL(pdl=PDL, token=TOKEN)
+    api = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
     api.set_collects("consumption_load_curve")
     await api.async_update()
     resultat = api.stats["consumption"]
@@ -27,7 +27,7 @@ async def test_compute(mock_enedis: Mock) -> None:  # pylint: disable=unused-arg
     assert resultat[0]["notes"] == "standard"
     assert resultat[0]["value"] == 1.296
 
-    api = EnedisByPDL(pdl=PDL, token=TOKEN)
+    api = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
     api.set_collects("daily_consumption")
     await api.async_update()
     resultat = api.stats["consumption"]
@@ -37,7 +37,6 @@ async def test_compute(mock_enedis: Mock) -> None:  # pylint: disable=unused-arg
 
 
 @freeze_time("2023-03-01")
-@pytest.mark.asyncio
 async def test_without_offpeak(
     mock_enedis: Mock,
 ) -> None:  # pylint: disable=unused-argument
@@ -45,7 +44,7 @@ async def test_without_offpeak(
     await mock_enedis()
     prices: dict[str, Any] = {"standard": {"price": 0.17}}
     # Test standard price
-    api = EnedisByPDL(pdl=PDL, token=TOKEN)
+    api = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
     api.set_collects("consumption_load_curve", prices=prices)
     await api.async_update_collects()
     resultat = api.stats["consumption"]
@@ -62,14 +61,13 @@ async def test_without_offpeak(
 
 
 @freeze_time("2023-03-01")
-@pytest.mark.asyncio
 async def test_with_offpeak(
     mock_enedis: Mock,  # pylint: disable=unused-argument
 ) -> None:
     """Test without offpeak , with price."""
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
     prices: dict[str, Any] = {"standard": {"price": 0.17}, "offpeak": {"price": 0.18}}
-    api = EnedisByPDL(pdl=PDL, token=TOKEN)
+    api = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
     api.set_collects("consumption_load_curve", prices=prices, intervals=intervals)
     await api.async_update_collects()
     resultat = api.stats["consumption"]
@@ -81,7 +79,7 @@ async def test_with_offpeak(
     print(resultat)
 
     # Without cums
-    api = EnedisByPDL(pdl=PDL, token=TOKEN)
+    api = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
     api.set_collects("consumption_load_curve", prices=prices, intervals=intervals)
     await api.async_update_collects()
     resultat = api.stats["consumption"]
@@ -93,7 +91,7 @@ async def test_with_offpeak(
     print(resultat)
 
     # Without price
-    api = EnedisByPDL(pdl=PDL, token=TOKEN)
+    api = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
     api.set_collects("consumption_load_curve", intervals=intervals)
     await api.async_update_collects()
     resultat = api.stats["consumption"]
@@ -102,7 +100,7 @@ async def test_with_offpeak(
     print(resultat)
 
     # Daily
-    api = EnedisByPDL(pdl=PDL, token=TOKEN)
+    api = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
     api.set_collects("daily_consumption", prices=prices, intervals=intervals)
     await api.async_update_collects()
     resultat = api.stats["consumption"]
@@ -112,14 +110,13 @@ async def test_with_offpeak(
 
 
 @freeze_time("2023-03-01")
-@pytest.mark.asyncio
 async def test_daily_with_offpeak(
     mock_enedis: Mock,  # pylint: disable=unused-argument
 ) -> None:
     """Test daily with offpeak."""
     prices: dict[str, Any] = {"standard": {"price": 0.17}, "offpeak": {"price": 0.18}}
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
-    api = EnedisByPDL(pdl=PDL, token=TOKEN)
+    api = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
     api.set_collects("daily_consumption", prices=prices, intervals=intervals)
     await api.async_update_collects()
     resultat = api.stats["consumption"]
@@ -128,7 +125,6 @@ async def test_daily_with_offpeak(
 
 
 @freeze_time("2023-03-01")
-@pytest.mark.asyncio
 async def test_compare(mock_enedis: Mock) -> None:  # pylint: disable=unused-argument
     """Test details compare."""
     prices: dict[str, Any] = {"standard": {"price": 0.17}, "offpeak": {"price": 0.18}}
@@ -141,7 +137,7 @@ async def test_compare(mock_enedis: Mock) -> None:  # pylint: disable=unused-arg
         "offpeak": {"sum_price": 0},
     }
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
-    api = EnedisByPDL(pdl=PDL, token=TOKEN)
+    api = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
     api.set_collects(
         "consumption_load_curve",
         prices=prices,
@@ -198,14 +194,13 @@ async def test_compare(mock_enedis: Mock) -> None:  # pylint: disable=unused-arg
 
 
 @freeze_time("2023-03-01")
-@pytest.mark.asyncio
 async def test_cumsums(mock_enedis: Mock) -> None:  # pylint: disable=unused-argument
     """Test cumulative summary."""
     prices: dict[str, Any] = {"standard": {"price": 0.17}, "offpeak": {"price": 0.18}}
     cumsum_value: dict[str, Any] = {"standard": 100, "offpeak": 1000}
     cumsum_price: dict[str, Any] = {"standard": 50, "offpeak": 75}
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
-    api = EnedisByPDL(pdl=PDL, token=TOKEN)
+    api = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
     api.set_collects(
         "consumption_load_curve",
         start=dt.strptime("2023-03-01", "%Y-%m-%d"),
@@ -226,12 +221,11 @@ async def test_cumsums(mock_enedis: Mock) -> None:  # pylint: disable=unused-arg
 
 
 @freeze_time("2023-03-01")
-@pytest.mark.asyncio
 async def test_extra_date(mock_base: Mock, mock_detail) -> None:  # pylint: disable=unused-argument
     """Test cumulative summary."""
     prices: dict[str, Any] = {"standard": {"price": 0.17}, "offpeak": {"price": 0.18}}
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
-    api = EnedisByPDL(pdl=PDL, token=TOKEN)
+    api = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
     api.set_collects(
         "consumption_load_curve",
         start=dt.strptime("2023-03-01", "%Y-%m-%d"),
@@ -264,7 +258,6 @@ async def test_extra_date(mock_base: Mock, mock_detail) -> None:  # pylint: disa
 
 
 @freeze_time("2023-3-1")
-@pytest.mark.asyncio
 async def test_tempo(mock_enedis: Mock) -> None:  # pylint: disable=unused-argument
     """Test tempo pricings."""
     prices: dict[str, Any] = {
@@ -282,7 +275,7 @@ async def test_tempo(mock_enedis: Mock) -> None:  # pylint: disable=unused-argum
     cumsum_value: dict[str, Any] = {"standard": 100, "offpeak": 1000}
     cumsum_price: dict[str, Any] = {"standard": 50, "offpeak": 75}
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
-    api = EnedisByPDL(pdl=PDL, token=TOKEN)
+    api = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
     api.set_collects(
         "consumption_load_curve",
         prices=prices,
@@ -300,7 +293,7 @@ async def test_tempo(mock_enedis: Mock) -> None:  # pylint: disable=unused-argum
     assert api.tempo_day == "blue"
 
     # Check Daily -> compute not possible.
-    api = EnedisByPDL(pdl=PDL, token=TOKEN)
+    api = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
     api.set_collects("daily_production", prices=prices, intervals=intervals)
     await api.async_update_collects()
     resultat = api.stats.get("production")
@@ -308,21 +301,20 @@ async def test_tempo(mock_enedis: Mock) -> None:  # pylint: disable=unused-argum
 
 
 @freeze_time("2023-03-01")
-@pytest.mark.asyncio
 async def test_standard_offpeak_cumsum(
     mock_enedis: Mock,  # pylint: disable=unused-argument
 ) -> None:
     """Test with offpeak and cumsum."""
     prices: dict[str, Any] = {"standard": {"price": 0.5}, "offpeak": {"price": 1}}
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
-    api = EnedisByPDL(pdl=PDL, token=TOKEN)
+    api = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
     api.set_collects("consumption_load_curve", prices=prices, intervals=intervals)
     await api.async_update_collects()
     resultat = api.stats["consumption"]
     assert resultat[0]["value"] == 1.079
 
     # Test daily data , check ignore intervals.
-    api = EnedisByPDL(pdl=PDL, token=TOKEN)
+    api = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
     api.set_collects("daily_consumption", prices=prices, intervals=intervals)
     await api.async_update_collects()
     resultat = api.stats["consumption"]
@@ -332,7 +324,7 @@ async def test_standard_offpeak_cumsum(
 @pytest.mark.asyncio
 async def test_start_date(mock_enedis: Mock) -> None:  # pylint: disable=unused-argument
     """Test with start_date."""
-    api = EnedisByPDL(pdl=PDL, token=TOKEN)
+    api = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
     api.set_collects(
         "consumption_load_curve", start=dt.strptime("2023-3-7", "%Y-%m-%d")
     )
@@ -349,13 +341,12 @@ async def test_start_date(mock_enedis: Mock) -> None:  # pylint: disable=unused-
 
 
 @freeze_time("2023-3-1")
-@pytest.mark.asyncio
 async def test_twice_call(
     mock_enedis: Mock,  # pylint: disable=unused-argument
 ) -> None:
     """Tests raise exception."""
     intervals = [("01:30:00", "08:00:00"), ("12:30:00", "14:00:00")]
-    api = EnedisByPDL(pdl=PDL, token=TOKEN)
+    api = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
     api.set_collects("consumption_load_curve", intervals=intervals)
     api.set_collects("daily_production")
     await api.async_update()

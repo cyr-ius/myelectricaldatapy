@@ -4,10 +4,11 @@
 codespell
 mypy
 pre-commit
-python-typing-update
-ruff
-yamllint
-types-requests
 pytest
 pytest-asyncio
+python-typing-update
+ruff
 setuptools_scm
+types-requests
+yamllint
+freezegun
