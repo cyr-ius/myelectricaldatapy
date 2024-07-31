@@ -84,7 +84,14 @@ CUM_SCH = vol.Schema(
 
 
 class EnedisByPDL:
-    """PDL class."""
+    """Enedis by PDL class.
+
+    This class allows you to obtain information specific to a connection point.
+
+    The "set_collect" function allows you to specify the collection parameters from Enedis
+    The "async_update_collects" function allows you to perform the calculations
+    The result is displayed in the property: stats
+    y"""
 
     def __init__(
         self,
@@ -291,7 +298,25 @@ class EnedisByPDL:
         cum_value: dict[str, Any] | None = None,
         cum_price: dict[str, Any] | None = None,
     ) -> None:
-        """Set parameters for data collect."""
+        """Set parameters for data collect.
+
+        service: "daily_production" or "daily_consumption" or "detail_production" or "detail_consumption"
+        start: date of begin to collect data
+        end: date of end to collect data
+        intervals: offpeak hours range - ex: [("01:00","05:00"),("12:00","14:00")]
+        prices: price for standard interval and offpeak interval
+            ex: {
+                    "standard": [float], "offpeak": [float]
+                }
+            ex: {
+                    "standard":{"blue":[float],"white":[float],"red":[float]},
+                    "offpeak":{"blue":[float],"white":[float],"red":[float]}
+                }
+        cum_sum: price of start
+            ex: {"standard":[float], "offpeak":[float]}
+        cum_price:
+            ex: {"standard":[float], "offpeak":[float]}
+        """
         funcs: dict[str, Callable[..., Any]] = {
             DAILY_PROD: self._api.async_get_daily_production,
             DETAIL_PROD: self._api.async_get_details_production,
@@ -315,7 +340,11 @@ class EnedisByPDL:
         self.has_parameters = True
 
     async def async_update_collects(self) -> None:
-        """Update data to collect."""
+        """Update data to collect.
+
+        It is necessary to value the initial data via the method: set_collects.
+        The execution of this method updates the property: stats.
+        """
         checked = True
         self.has_collected = False
         for mode, attr in self._params.items():
