@@ -23,7 +23,7 @@ class Enedis:
         self, token: str, session: ClientSession | None = None, timeout: int = TIMEOUT
     ) -> None:
         """Initialize."""
-        session = ClientSession() if session is None else session
+        session = session or ClientSession()
         self.auth = EnedisAuth(session, token, timeout)
         self.async_request = self.auth.async_request
         self.offpeaks: list[str] = []
