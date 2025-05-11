@@ -3,15 +3,12 @@
 from __future__ import annotations
 
 from datetime import datetime as dt, timedelta
-import logging
 import re
 from typing import Any, Collection, Tuple
 
 import pandas as pd
 
 from .const import ATTR_OFFPEAK, ATTR_STANDARD
-
-_LOGGER = logging.getLogger(__name__)
 
 
 class EnedisAnalytics:
@@ -94,7 +91,7 @@ class EnedisAnalytics:
             self._get_data_interval(intervals)
 
         if groupby:
-            freq = "H" if step_hour else "D"
+            freq = "h" if step_hour else "D"
             self.df = (
                 self.df.groupby(["notes", pd.Grouper(key="date", freq=freq)])["value"]
                 .sum()
