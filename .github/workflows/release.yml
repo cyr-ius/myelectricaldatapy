@@ -8,13 +8,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # To use this repository's private action, you must check out the repository
-      - name: Checkout
+      - name: 📥 Checkout the repository
         uses: actions/checkout@v4
+
       - name: Generate changelog
         id: changelog
         uses: metcalfc/changelog-generator@v4.6.2
         with:
           myToken: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Create Release
         id: create_release
         uses: actions/create-release@latest
@@ -25,4 +27,32 @@ jobs:
           release_name: ${{ github.ref }}
           body: ${{ steps.changelog.outputs.changelog }}
           draft: false
-          prerelease: false
+          prerelease: ${{ contains(github.ref_name,'-') }}
+  publish:
+    needs: release
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+    if: ${{ ! contains(github.ref_name, '-') }}
+    steps:
+      - name: 📥 Checkout the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: 📦 Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install setuptools wheel twine build
+
+      - name: Build package
+        shell: bash
+        run: |
+          python -m build
+
+      - name: 🚀 Publish to PyPi
+        uses: pypa/gh-action-pypi-publish@release/v1
