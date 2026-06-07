@@ -35,6 +35,7 @@ dependencies    = [
 dev = [
     "prek",
     "ruff",
+    "yamllint",
 ]
 
 [project.urls]
