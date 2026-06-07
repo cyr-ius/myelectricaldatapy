@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name        = "myelectricaldatapy"
 dynamic     = ["version"]
-license     = {text = "GPL-3"}
+license     = "GPL-3.0-or-later"
 description = "Fetch Linky data from myelectricaldata.fr"
 readme      = "README.md"
 authors     = [
@@ -15,13 +15,13 @@ keywords    = ["enedis", "linky", "async", "myelectricaldata"]
 classifiers = [
     "Programming Language :: Python",
     "Development Status :: 5 - Production/Stable",
-    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Framework :: AsyncIO",
     "Intended Audience :: Developers",
-    "Intended Audience :: System Administrators",
     "Topic :: Home Automation",
 ]
 requires-python = ">=3.10.0"
@@ -31,10 +31,19 @@ dependencies    = [
     "voluptuous>=0.13.1",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "prek",
+    "ruff",
+]
+
 [project.urls]
 Homepage = "https://github.com/cyr-ius/myelectricaldatapy"
 
 [tool.setuptools_scm]
+
+[tool.setuptools]
+platforms = ["any"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
