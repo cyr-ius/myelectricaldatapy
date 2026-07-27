@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import date, datetime as dt, timedelta
 import logging
-from typing import Any, Callable, Tuple
+from typing import Any
 
 from aiohttp import ClientSession
 import voluptuous as vol
@@ -116,7 +117,7 @@ class EnedisByPDL:
         self.ecowatt: dict[str, Any] = {}
         self.has_collected: bool = False
         self.has_parameters: bool = False
-        self.intervals: list[Tuple[str, str]] = []
+        self.intervals: list[tuple[str, str]] = []
         self.last_access: dt = dt.now()
         self.last_refresh: date | None = None
         self.max_power: dict[str, Any] = {}
@@ -241,7 +242,7 @@ class EnedisByPDL:
         """Enable or Disable Max power Subscription."""
         self._maxpower_subs = activate is True
 
-    def _set_intervals(self, mode: str, intervals: list[Tuple[str, str]]) -> None:
+    def _set_intervals(self, mode: str, intervals: list[tuple[str, str]]) -> None:
         """Set intervals."""
         if isinstance(intervals, list):
             self.intervals = intervals
@@ -293,7 +294,7 @@ class EnedisByPDL:
         service: str,
         start: dt | None = None,
         end: dt | None = None,
-        intervals: list[Tuple[str, str]] | None = None,
+        intervals: list[tuple[str, str]] | None = None,
         prices: dict[str, Any] | None = None,
         cum_value: dict[str, Any] | None = None,
         cum_price: dict[str, Any] | None = None,
