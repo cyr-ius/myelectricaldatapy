@@ -92,7 +92,7 @@ async def test_fetch_data(mock_detail) -> None:
         )
         assert (
             resultat["meter_reading"]["interval_reading"]
-            == mock_detail["meter_reading"]["interval_reading"]  # noqa
+            == mock_detail["meter_reading"]["interval_reading"]
         )
 
 

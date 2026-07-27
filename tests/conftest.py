@@ -48,7 +48,7 @@ def mock_tempo(return_invalid: bool = False) -> dict[str, Any]:
 def mock_ecowatt(request) -> dict[str, Any]:
     if hasattr(request, "param") and request.param:
         return {
-            "detail": "Pas de données disponible entre la date du 2023-01-22 00:00:00 et 2023-01-22 00:00:00"  # noqa
+            "detail": "Pas de données disponible entre la date du 2023-01-22 00:00:00 et 2023-01-22 00:00:00"
         }
     return json.loads(load_fixture("ecowatt.json"))
 

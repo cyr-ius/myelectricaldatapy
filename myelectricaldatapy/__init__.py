@@ -1,5 +1,3 @@
-# -*- coding:utf-8 -*-
-
 """myelectricaldatapy package."""
 
 from .exceptions import (
@@ -13,8 +11,8 @@ from .mypdl import EnedisByPDL
 
 __all__ = [
     "Enedis",
-    "EnedisException",
     "EnedisByPDL",
+    "EnedisException",
     "HttpRequestError",
     "LimitReached",
     "TimeoutExceededError",

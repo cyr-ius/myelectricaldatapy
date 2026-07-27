@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Generator
 from datetime import date, datetime as dt, timedelta
 import logging
 import re
-from typing import Any, Generator, cast
+from typing import Any, cast
 
 from aiohttp import ClientSession
 

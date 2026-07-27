@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from datetime import datetime as dt, timedelta
 import re
-from typing import Any, Collection, Tuple
+from typing import Any
 
 import pandas as pd
 
@@ -25,7 +26,7 @@ class EnedisAnalytics:
         convertKwh: bool = False,
         convertUTC: bool = False,
         start_date: dt | None = None,
-        intervals: list[Tuple[str, str]] | None = None,
+        intervals: list[tuple[str, str]] | None = None,
         groupby: bool = False,
         summary: bool = False,
         cum_value: dict[str, Any] = {},
@@ -138,7 +139,7 @@ class EnedisAnalytics:
             return int(rslt[0]) / 60
         return 1
 
-    def _get_data_interval(self, intervals: list[Tuple[str, str]]) -> pd.DataFrame:
+    def _get_data_interval(self, intervals: list[tuple[str, str]]) -> pd.DataFrame:
         """Group date from range time."""
         for interval in intervals:
             # Convert str to datetime
