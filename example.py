@@ -2,12 +2,13 @@
 """Example code."""
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import timedelta
 import logging
 
 import yaml
 
 from myelectricaldatapy import Enedis, EnedisByPDL, EnedisException
+from myelectricaldatapy.tz import local_now
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -32,8 +33,8 @@ async def async_main() -> None:
     api = Enedis(token=TOKEN)
 
     try:
-        start = datetime.now() - timedelta(days=7)
-        end = datetime.now()
+        start = local_now() - timedelta(days=7)
+        end = local_now()
         data = await api.async_fetch_datas("consumption_load_curve", PDL, start, end)
         logger.info(data)
         data = await api.async_get_contract(PDL)

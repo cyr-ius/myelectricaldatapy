@@ -6,7 +6,7 @@ from collections.abc import Generator
 from datetime import date, datetime as dt, timedelta
 import logging
 import re
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from aiohttp import ClientSession
 
@@ -14,6 +14,9 @@ from .auth import EnedisAuth
 from .const import DAILY_CONSUM, DAILY_PROD, DETAIL_CONSUM, DETAIL_PROD, TIMEOUT
 from .exceptions import EnedisException
 from .tz import LOCAL_TIMEZONE, as_local, local_now
+
+if TYPE_CHECKING:
+    from typing_extensions import Self
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -183,14 +186,14 @@ class Enedis:
             except EnedisException as error:
                 raise_error = True
                 _LOGGER.error(error)
-            finally:
-                new_data = response.get("meter_reading", {}).get("interval_reading")
-                if response is None or new_data is None:
-                    continue
-                elif data is None:
-                    data = cast(dict[str, Any], response)
-                else:
-                    data["meter_reading"]["interval_reading"].extend(new_data)
+
+            new_data = response.get("meter_reading", {}).get("interval_reading")
+            if response is None or new_data is None:
+                continue
+            elif data is None:
+                data = cast(dict[str, Any], response)
+            else:
+                data["meter_reading"]["interval_reading"].extend(new_data)
 
         return data
 
@@ -208,7 +211,7 @@ class Enedis:
             start = s_end
         yield (start, end)
 
-    async def __aenter__(self) -> Enedis:
+    async def __aenter__(self) -> Self:
         """Asynchronous enter."""
         return self
 
