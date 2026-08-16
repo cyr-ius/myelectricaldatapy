@@ -54,6 +54,34 @@ async def test_tempoday(mock_enedis: Mock) -> None:  # pylint: disable=unused-ar
     assert mypdl.tempo_day == "blue"
 
 
+@freeze_time("2023-03-01")
+async def test_check_offpeak(mock_contract) -> None:
+    """Test off-peak hour detection against the real contract's schedule.
+
+    contract.json's offpeak_hours is "HC (1H30-8H00;12H30-14H00)". Patches
+    the HTTP layer (not async_get_contract itself) so the real parsing in
+    Enedis.async_get_contract runs and populates self.offpeaks.
+    """
+    with patch.object(
+        myelectricaldatapy.auth.EnedisAuth,
+        "async_request",
+        return_value=mock_contract,
+    ):
+        api = Enedis(token=TOKEN, session=ClientSession())
+        assert await api.async_has_offpeak(PDL) is True
+
+        # 03:00 falls inside the 01:30-08:00 off-peak window
+        assert await api.async_check_offpeak(PDL, dt(2023, 3, 1, 3, 0)) is True
+        # exactly on the lower bound is excluded (start, end] convention
+        assert await api.async_check_offpeak(PDL, dt(2023, 3, 1, 1, 30)) is False
+        # exactly on the upper bound is included
+        assert await api.async_check_offpeak(PDL, dt(2023, 3, 1, 8, 0)) is True
+        # standard hours, not off-peak
+        assert await api.async_check_offpeak(PDL, dt(2023, 3, 1, 10, 0)) is False
+        # second window 12:30-14:00
+        assert await api.async_check_offpeak(PDL, dt(2023, 3, 1, 13, 0)) is True
+
+
 async def test_valid_access(mock_enedis: Mock) -> None:  # pylint: disable=unused-argument
     """Test access."""
     api = Enedis(token=TOKEN, session=ClientSession())

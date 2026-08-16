@@ -28,7 +28,6 @@ class Enedis:
         self.auth = EnedisAuth(session, token, timeout)
         self.async_request = self.auth.async_request
         self.offpeaks: list[str] = []
-        self.dt_offpeak: list[dt] = []
         self.last_access: date | None = None
 
     async def async_fetch_datas(
@@ -69,13 +68,6 @@ class Enedis:
                 contract = usage_point.get("contracts", {})
                 if offpeak_hours := contract.get("offpeak_hours"):
                     self.offpeaks = re.findall("(?:(\\w+)-(\\w+))+", offpeak_hours)
-                    self.dt_offpeak = [
-                        (  # type: ignore
-                            dt.strptime(offpeak[0], "%HH%M"),
-                            dt.strptime(offpeak[1], "%HH%M"),
-                        )
-                        for offpeak in self.offpeaks
-                    ]
         return contract
 
     async def async_get_contracts(self, pdl: str) -> Any:
@@ -137,7 +129,7 @@ class Enedis:
             for range_time in self.offpeaks:
                 starting = dt.strptime(range_time[0], "%HH%M").time()
                 ending = dt.strptime(range_time[1], "%HH%M").time()
-                if ending <= start_time > starting:
+                if starting < start_time <= ending:
                     return True
         return False
 
