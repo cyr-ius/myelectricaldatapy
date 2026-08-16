@@ -12,6 +12,7 @@ import pytest
 
 import myelectricaldatapy
 from myelectricaldatapy import EnedisByPDL, LimitReached
+from myelectricaldatapy.tz import LOCAL_TIMEZONE
 
 from .consts import PDL, TOKEN
 
@@ -203,8 +204,8 @@ async def test_cumsums(mock_enedis: Mock) -> None:  # pylint: disable=unused-arg
     api = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
     api.set_collects(
         "consumption_load_curve",
-        start=dt.strptime("2023-03-01", "%Y-%m-%d"),
-        end=dt.strptime("2023-03-08", "%Y-%m-%d"),
+        start=dt.strptime("2023-03-01", "%Y-%m-%d").replace(tzinfo=LOCAL_TIMEZONE),
+        end=dt.strptime("2023-03-08", "%Y-%m-%d").replace(tzinfo=LOCAL_TIMEZONE),
         prices=prices,
         intervals=intervals,
         cum_value=cumsum_value,
@@ -228,8 +229,8 @@ async def test_extra_date(mock_base: Mock, mock_detail) -> None:  # pylint: disa
     api = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
     api.set_collects(
         "consumption_load_curve",
-        start=dt.strptime("2023-03-01", "%Y-%m-%d"),
-        end=dt.strptime("2023-03-28", "%Y-%m-%d"),
+        start=dt.strptime("2023-03-01", "%Y-%m-%d").replace(tzinfo=LOCAL_TIMEZONE),
+        end=dt.strptime("2023-03-28", "%Y-%m-%d").replace(tzinfo=LOCAL_TIMEZONE),
         prices=prices,
         intervals=intervals,
     )
@@ -243,8 +244,8 @@ async def test_extra_date(mock_base: Mock, mock_detail) -> None:  # pylint: disa
 
     api.set_collects(
         "consumption_load_curve",
-        start=dt.strptime("2023-03-01", "%Y-%m-%d"),
-        end=dt.strptime("2023-03-28", "%Y-%m-%d"),
+        start=dt.strptime("2023-03-01", "%Y-%m-%d").replace(tzinfo=LOCAL_TIMEZONE),
+        end=dt.strptime("2023-03-28", "%Y-%m-%d").replace(tzinfo=LOCAL_TIMEZONE),
         prices=prices,
         intervals=intervals,
     )
@@ -326,14 +327,16 @@ async def test_start_date(mock_enedis: Mock) -> None:  # pylint: disable=unused-
     """Test with start_date."""
     api = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
     api.set_collects(
-        "consumption_load_curve", start=dt.strptime("2023-3-7", "%Y-%m-%d")
+        "consumption_load_curve",
+        start=dt.strptime("2023-3-7", "%Y-%m-%d").replace(tzinfo=LOCAL_TIMEZONE),
     )
     await api.async_update_collects()
     resultat = api.stats["consumption"]
     assert len(resultat) == 0
 
     api.set_collects(
-        "consumption_load_curve", start=dt.strptime("2023-3-7", "%Y-%m-%d")
+        "consumption_load_curve",
+        start=dt.strptime("2023-3-7", "%Y-%m-%d").replace(tzinfo=LOCAL_TIMEZONE),
     )
     await api.async_update_collects()
     resultat = api.stats["consumption"]
