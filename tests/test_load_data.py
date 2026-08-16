@@ -44,7 +44,7 @@ async def test_tempoday(mock_enedis: Mock) -> None:  # pylint: disable=unused-ar
     """Test get tempo day."""
     api = Enedis(token=TOKEN, session=ClientSession())
     resultat = await api.async_get_tempo()
-    assert resultat["2023-3-1"] == "blue"
+    assert resultat["2023-03-01"] == "blue"
 
     mypdl = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
     mypdl.set_collects("consumption_load_curve")

@@ -142,7 +142,7 @@ class EnedisByPDL:
     @property
     def tempo_day(self) -> str | None:
         """Tempo day."""
-        str_date = dt.now().strftime("%Y-%-m-%-d")
+        str_date = dt.now().strftime("%Y-%m-%d")
         return self.tempo.get(str_date)
 
     @property
