@@ -182,13 +182,19 @@ class EnedisByPDL:
         start = dt.now() - timedelta(days=1095)
         end = dt.now() + timedelta(days=1)
         if force_refresh or self.last_access.date() != dt.now().date():
+            self.access = {}
             self.contract = {}
             self.address = {}
             self.ecowatt = {}
             self.max_power = {}
             self.has_collected = False
         try:
-            self.access = await self._api.async_valid_access(self.pdl)
+            if not self.access:
+                # Quota is scarce (ex: 50 calls/day on Enedis API), so the
+                # access/quota check is only refreshed once a day (or on
+                # force_refresh) instead of on every update cycle.
+                self.access = await self._api.async_valid_access(self.pdl)
+
             if self.access.get("quota_reached", False):
                 detail = self.access.get("information", "Quota reached")
                 raise LimitReached(409, {"detail": detail})
