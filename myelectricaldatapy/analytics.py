@@ -4,18 +4,33 @@ from __future__ import annotations
 
 from collections.abc import Collection
 from datetime import datetime as dt, timedelta
+import os
 import re
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
 from .const import ATTR_OFFPEAK, ATTR_STANDARD
 
 
+def _local_timezone() -> Any:
+    """Resolve the local IANA timezone so DST offsets stay correct per-date.
+
+    Falls back to the fixed UTC offset captured at call time when the
+    system timezone database cannot be resolved (e.g. non-Linux hosts).
+    """
+    try:
+        tz_path = os.path.realpath("/etc/localtime")
+        return ZoneInfo(tz_path.split("zoneinfo/")[-1])
+    except Exception:  # noqa: BLE001
+        return dt.now().astimezone().tzinfo
+
+
 class EnedisAnalytics:
     """Data analaytics."""
 
-    local_timezone = dt.now().astimezone().tzinfo
+    local_timezone = _local_timezone()
 
     def __init__(self, data: Collection[Collection[str]]) -> None:
         """Initialize Dataframe."""
@@ -29,12 +44,14 @@ class EnedisAnalytics:
         intervals: list[tuple[str, str]] | None = None,
         groupby: bool = False,
         summary: bool = False,
-        cum_value: dict[str, Any] = {},
-        cum_price: dict[str, Any] = {},
+        cum_value: dict[str, Any] | None = None,
+        cum_price: dict[str, Any] | None = None,
         prices: dict[str, Any] | None = None,
         tempo: dict[str, str] | None = None,
     ) -> Any:
         """Convert data to analyze."""
+        cum_value = cum_value or {}
+        cum_price = cum_price or {}
         step_hour = False
         if not self.df.empty:
             # Convert str to datetime
@@ -55,10 +72,7 @@ class EnedisAnalytics:
             if "interval_length" in self.df:
                 step_hour = True
                 self.df.loc[
-                    (
-                        self.df.date.dt.minute
-                        == dt.strptime("00:00:00", "%H:%M:%S").minute
-                    ),
+                    (self.df.date.dt.minute == 0),
                     "date",
                 ] = self.df.date - timedelta(minutes=1)
 
