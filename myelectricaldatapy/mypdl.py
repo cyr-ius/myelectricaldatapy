@@ -32,6 +32,7 @@ from .const import (
     PRODUCTION,
     TIMEOUT,
 )
+from .tz import as_local, local_now
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -118,7 +119,7 @@ class EnedisByPDL:
         self.has_collected: bool = False
         self.has_parameters: bool = False
         self.intervals: list[tuple[str, str]] = []
-        self.last_access: dt = dt.now()
+        self.last_access: dt = local_now()
         self.last_refresh: date | None = None
         self.max_power: dict[str, Any] = {}
         self.tempo: dict[str, Any] = {}
@@ -136,13 +137,13 @@ class EnedisByPDL:
     @property
     def ecowatt_day(self) -> Any:
         """ecowatt."""
-        str_date = dt.now().strftime("%Y-%m-%d")
+        str_date = local_now().strftime("%Y-%m-%d")
         return self.ecowatt.get(str_date, {})
 
     @property
     def tempo_day(self) -> str | None:
         """Tempo day."""
-        str_date = dt.now().strftime("%Y-%m-%d")
+        str_date = local_now().strftime("%Y-%m-%d")
         return self.tempo.get(str_date)
 
     @property
@@ -179,22 +180,16 @@ class EnedisByPDL:
 
     async def async_update(self, force_refresh: bool = False) -> None:
         """Update data."""
-        start = dt.now() - timedelta(days=1095)
-        end = dt.now() + timedelta(days=1)
-        if force_refresh or self.last_access.date() != dt.now().date():
-            self.access = {}
+        start = local_now() - timedelta(days=1095)
+        end = local_now() + timedelta(days=1)
+        if force_refresh or self.last_access.date() != local_now().date():
             self.contract = {}
             self.address = {}
             self.ecowatt = {}
             self.max_power = {}
             self.has_collected = False
         try:
-            if not self.access:
-                # Quota is scarce (ex: 50 calls/day on Enedis API), so the
-                # access/quota check is only refreshed once a day (or on
-                # force_refresh) instead of on every update cycle.
-                self.access = await self._api.async_valid_access(self.pdl)
-
+            self.access = await self._api.async_valid_access(self.pdl)
             if self.access.get("quota_reached", False):
                 detail = self.access.get("information", "Quota reached")
                 raise LimitReached(409, {"detail": detail})
@@ -224,11 +219,11 @@ class EnedisByPDL:
 
             if self.has_parameters and self.has_collected is False:
                 await self.async_update_collects()
-                self.last_refresh = dt.now()
+                self.last_refresh = local_now()
         except EnedisException as error:
             raise error from error
         finally:
-            self.last_access = dt.now()
+            self.last_access = local_now()
 
     def tempo_subscription(self, activate: bool = False) -> None:
         """Enable or Disable Tempo Subscription."""
@@ -333,8 +328,8 @@ class EnedisByPDL:
         days = 1095 if service in [DAILY_PROD, DAILY_CONSUM] else 7
         mode = CONSUMPTION if service in [DAILY_CONSUM, DETAIL_CONSUM] else PRODUCTION
         func = funcs[service]
-        dt_start = start if start else dt.now() - timedelta(days=days)
-        dt_end = end if end else dt.now() + timedelta(days=1)
+        dt_start = as_local(start) if start else local_now() - timedelta(days=days)
+        dt_end = as_local(end) if end else local_now() + timedelta(days=1)
         self._params[mode] = {ATTR_FN: func, ATTR_START: dt_start, ATTR_END: dt_end}
         if intervals:
             self._set_intervals(mode, intervals)

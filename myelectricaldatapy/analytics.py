@@ -4,33 +4,19 @@ from __future__ import annotations
 
 from collections.abc import Collection
 from datetime import datetime as dt, timedelta
-import os
 import re
 from typing import Any
-from zoneinfo import ZoneInfo
 
 import pandas as pd
 
 from .const import ATTR_OFFPEAK, ATTR_STANDARD
-
-
-def _local_timezone() -> Any:
-    """Resolve the local IANA timezone so DST offsets stay correct per-date.
-
-    Falls back to the fixed UTC offset captured at call time when the
-    system timezone database cannot be resolved (e.g. non-Linux hosts).
-    """
-    try:
-        tz_path = os.path.realpath("/etc/localtime")
-        return ZoneInfo(tz_path.split("zoneinfo/")[-1])
-    except Exception:  # noqa: BLE001
-        return dt.now().astimezone().tzinfo
+from .tz import LOCAL_TIMEZONE
 
 
 class EnedisAnalytics:
     """Data analaytics."""
 
-    local_timezone = _local_timezone()
+    local_timezone = LOCAL_TIMEZONE
 
     def __init__(self, data: Collection[Collection[str]]) -> None:
         """Initialize Dataframe."""
@@ -78,7 +64,8 @@ class EnedisAnalytics:
 
             if start_date:
                 dt_start_date = pd.to_datetime(start_date, format="%Y-%m-%d %H:%M:%S")
-                dt_start_date = dt_start_date.tz_localize(self.local_timezone)
+                if dt_start_date.tzinfo is None:
+                    dt_start_date = dt_start_date.tz_localize(self.local_timezone)
                 self.df = self.df[(self.df.date > dt_start_date)]
 
             self.df.index = self.df.date
