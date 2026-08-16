@@ -11,6 +11,7 @@ import pytest
 
 import myelectricaldatapy
 from myelectricaldatapy import Enedis, EnedisByPDL, EnedisException, LimitReached
+from myelectricaldatapy.tz import LOCAL_TIMEZONE, local_now
 
 from .consts import PDL, TOKEN
 
@@ -71,15 +72,40 @@ async def test_check_offpeak(mock_contract) -> None:
         assert await api.async_has_offpeak(PDL) is True
 
         # 03:00 falls inside the 01:30-08:00 off-peak window
-        assert await api.async_check_offpeak(PDL, dt(2023, 3, 1, 3, 0)) is True
+        assert (
+            await api.async_check_offpeak(
+                PDL, dt(2023, 3, 1, 3, 0, tzinfo=LOCAL_TIMEZONE)
+            )
+            is True
+        )
         # exactly on the lower bound is excluded (start, end] convention
-        assert await api.async_check_offpeak(PDL, dt(2023, 3, 1, 1, 30)) is False
+        assert (
+            await api.async_check_offpeak(
+                PDL, dt(2023, 3, 1, 1, 30, tzinfo=LOCAL_TIMEZONE)
+            )
+            is False
+        )
         # exactly on the upper bound is included
-        assert await api.async_check_offpeak(PDL, dt(2023, 3, 1, 8, 0)) is True
+        assert (
+            await api.async_check_offpeak(
+                PDL, dt(2023, 3, 1, 8, 0, tzinfo=LOCAL_TIMEZONE)
+            )
+            is True
+        )
         # standard hours, not off-peak
-        assert await api.async_check_offpeak(PDL, dt(2023, 3, 1, 10, 0)) is False
+        assert (
+            await api.async_check_offpeak(
+                PDL, dt(2023, 3, 1, 10, 0, tzinfo=LOCAL_TIMEZONE)
+            )
+            is False
+        )
         # second window 12:30-14:00
-        assert await api.async_check_offpeak(PDL, dt(2023, 3, 1, 13, 0)) is True
+        assert (
+            await api.async_check_offpeak(
+                PDL, dt(2023, 3, 1, 13, 0, tzinfo=LOCAL_TIMEZONE)
+            )
+            is True
+        )
 
 
 async def test_valid_access(mock_enedis: Mock) -> None:  # pylint: disable=unused-argument
@@ -115,8 +141,8 @@ async def test_fetch_data(mock_detail) -> None:
         resultat = await api.async_fetch_datas(
             service="comsumption_load_curve",
             pdl=PDL,
-            start=dt.strptime("2022-12-30", "%Y-%m-%d"),
-            end=dt.strptime("2022-12-31", "%Y-%m-%d"),
+            start=dt.strptime("2022-12-30", "%Y-%m-%d").replace(tzinfo=LOCAL_TIMEZONE),
+            end=dt.strptime("2022-12-31", "%Y-%m-%d").replace(tzinfo=LOCAL_TIMEZONE),
         )
         assert (
             resultat["meter_reading"]["interval_reading"]
@@ -128,7 +154,7 @@ async def test_force_refresh(
     mock_enedis: Mock,  # pylint: disable=unused-argument
 ) -> None:
     """Test refresh object."""
-    last_call = dt.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
+    last_call = local_now().strftime("%Y-%m-%dT%H:%M:%S.%f")
     access = {
         "valid": True,
         "quota_reached": False,

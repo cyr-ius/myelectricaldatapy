@@ -13,6 +13,7 @@ from aiohttp import ClientSession
 from .auth import EnedisAuth
 from .const import DAILY_CONSUM, DAILY_PROD, DETAIL_CONSUM, DETAIL_PROD, TIMEOUT
 from .exceptions import EnedisException
+from .tz import LOCAL_TIMEZONE, as_local, local_now
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -40,7 +41,7 @@ class Enedis:
                     daily_consumption, daily_production,
                     consumption_load_curve, production_load_curve
         """
-        self.last_access = dt.now()
+        self.last_access = local_now()
         path_range = ""
         if start and end:
             start_date = start.strftime("%Y-%m-%d")
@@ -93,12 +94,12 @@ class Enedis:
     ) -> Any:
         """Return Tempo Day."""
         str_start = (
-            start.strftime("%Y-%m-%d") if start else dt.now().strftime("%Y-%m-%d")
+            start.strftime("%Y-%m-%d") if start else local_now().strftime("%Y-%m-%d")
         )
         str_end = (
             end.strftime("%Y-%m-%d")
             if end
-            else (dt.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+            else (local_now() + timedelta(days=1)).strftime("%Y-%m-%d")
         )
         return await self.auth.async_request(path=f"rte/tempo/{str_start}/{str_end}")
 
@@ -107,12 +108,12 @@ class Enedis:
     ) -> Any:
         """Return Ecowatt information."""
         str_start = (
-            start.strftime("%Y-%m-%d") if start else dt.now().strftime("%Y-%m-%d")
+            start.strftime("%Y-%m-%d") if start else local_now().strftime("%Y-%m-%d")
         )
         str_end = (
             end.strftime("%Y-%m-%d")
             if end
-            else (dt.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+            else (local_now() + timedelta(days=1)).strftime("%Y-%m-%d")
         )
         return await self.async_request(path=f"rte/ecowatt/{str_start}/{str_end}")
 
@@ -125,10 +126,20 @@ class Enedis:
     async def async_check_offpeak(self, pdl: str, start: dt) -> bool:
         """Return offpeak status."""
         if await self.async_has_offpeak(pdl) is True:
-            start_time = start.time()
+            # Off-peak windows are defined in local wall-clock time, so a
+            # start given in another timezone must be converted first.
+            start_time = as_local(start).astimezone(LOCAL_TIMEZONE).time()
             for range_time in self.offpeaks:
-                starting = dt.strptime(range_time[0], "%HH%M").time()
-                ending = dt.strptime(range_time[1], "%HH%M").time()
+                starting = (
+                    dt.strptime(range_time[0], "%HH%M")
+                    .replace(tzinfo=LOCAL_TIMEZONE)
+                    .time()
+                )
+                ending = (
+                    dt.strptime(range_time[1], "%HH%M")
+                    .replace(tzinfo=LOCAL_TIMEZONE)
+                    .time()
+                )
                 if starting < start_time <= ending:
                     return True
         return False
