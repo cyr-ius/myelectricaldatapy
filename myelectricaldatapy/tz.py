@@ -7,7 +7,7 @@ convention explicit and DST-safe, instead of relying on a fixed UTC offset
 captured once at import time.
 """
 
-from datetime import datetime as dt, timezone as _timezone, tzinfo as _tzinfo
+from datetime import UTC, datetime as dt, tzinfo as _tzinfo
 import os
 from typing import cast
 from zoneinfo import ZoneInfo
@@ -25,7 +25,7 @@ def _resolve_local_timezone() -> _tzinfo:
     except Exception:  # noqa: BLE001
         # dt.now().astimezone() always sets tzinfo when called without
         # arguments; typeshed just can't express that.
-        return cast(_tzinfo, dt.now().astimezone().tzinfo) or _timezone.utc
+        return cast(_tzinfo, dt.now().astimezone().tzinfo) or UTC
 
 
 LOCAL_TIMEZONE = _resolve_local_timezone()

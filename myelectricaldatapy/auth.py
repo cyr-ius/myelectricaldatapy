@@ -44,7 +44,7 @@ class EnedisAuth:
                 response = await self.session.request(method, f"{URL}/{path}", **kwargs)
                 contents = await response.read()
                 response.raise_for_status()
-        except (asyncio.CancelledError, asyncio.TimeoutError) as error:
+        except (TimeoutError, asyncio.CancelledError) as error:
             raise TimeoutExceededError(
                 "Timeout occurred while connecting to MyElectricalData."
             ) from error
