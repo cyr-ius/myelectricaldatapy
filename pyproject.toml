@@ -16,8 +16,6 @@ classifiers = [
     "Programming Language :: Python",
     "Development Status :: 5 - Production/Stable",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
@@ -25,7 +23,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "Topic :: Home Automation",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies    = [
     "aiohttp>=3.8.1",
     "pandas>=2.0.2",
