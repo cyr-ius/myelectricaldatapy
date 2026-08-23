@@ -1,18 +1,15 @@
 """Class for my PDL."""
 
-from __future__ import annotations
-
 from collections.abc import Callable
 from datetime import date, datetime as dt, timedelta
 import logging
-from typing import Any
+from typing import Any, Literal
 
 from aiohttp import ClientSession
 import voluptuous as vol
 
-from myelectricaldatapy import Enedis, EnedisException, LimitReached
-
 from .analytics import EnedisAnalytics
+from .api import Enedis
 from .const import (
     ATTR_CUM_PRICE,
     ATTR_CUM_VALUE,
@@ -20,6 +17,7 @@ from .const import (
     ATTR_FN,
     ATTR_INTERVALS,
     ATTR_OFFPEAK,
+    ATTR_PRICE,
     ATTR_PRICES,
     ATTR_SERVICE,
     ATTR_STANDARD,
@@ -32,6 +30,7 @@ from .const import (
     PRODUCTION,
     TIMEOUT,
 )
+from .exceptions import EnedisException, LimitReached
 from .tz import as_local, local_now
 
 _LOGGER = logging.getLogger(__name__)
@@ -54,10 +53,10 @@ MODES_SCH = vol.Schema(
 PRICE_SCH = vol.Schema(
     {
         vol.Required(ATTR_STANDARD): {
-            vol.Required("price"): vol.Any(int, float),
+            vol.Required(ATTR_PRICE): vol.Any(int, float),
         },
         vol.Optional(ATTR_OFFPEAK): {
-            vol.Required("price"): vol.Any(int, float),
+            vol.Required(ATTR_PRICE): vol.Any(int, float),
         },
     }
 )
@@ -135,6 +134,34 @@ class EnedisByPDL:
         return len(self.intervals) > 0
 
     @property
+    def has_tempo_subscription(self) -> bool:
+        """Tempo subscription status."""
+        return self._tempo_subs
+
+    @property
+    def has_offpeak_hours_subscription(self) -> bool:
+        """Offpeak hours subscription status."""
+        return self._off_subs
+
+    @property
+    def has_ecowatt_subscription(self) -> bool:
+        """Ecowatt subscription status."""
+        return self._ecowatt_subs
+
+    @property
+    def has_maxpower_subscription(self) -> bool:
+        """Max power subscription status."""
+        return self._maxpower_subs
+
+    @property
+    def subscription(self) -> Literal["hphc", "tempo", "standard"]:
+        if self.has_tempo_subscription:
+            return "tempo"
+        if self.has_offpeak_hours_subscription:
+            return "hphc"
+        return "standard"
+
+    @property
     def ecowatt_day(self) -> Any:
         """ecowatt."""
         str_date = local_now().strftime("%Y-%m-%d")
@@ -180,14 +207,18 @@ class EnedisByPDL:
 
     async def async_update(self, force_refresh: bool = False) -> None:
         """Update data."""
+
         start = local_now() - timedelta(days=1095)
         end = local_now() + timedelta(days=1)
-        if force_refresh or self.last_access.date() != local_now().date():
-            self.contract = {}
-            self.address = {}
-            self.ecowatt = {}
-            self.max_power = {}
+
+        if force_refresh or (self.last_access.date() != local_now().date()):
+            self.contract.clear()
+            self.contract.clear()
+            self.address.clear()
+            self.ecowatt.clear()
+            self.max_power.clear()
             self.has_collected = False
+
         try:
             self.access = await self._api.async_valid_access(self.pdl)
             if self.access.get("quota_reached", False):
@@ -338,7 +369,7 @@ class EnedisByPDL:
         if cum_value:
             self._set_cumsum(mode, "value", cum_value)
         if cum_price:
-            self._set_cumsum(mode, "price", cum_price)
+            self._set_cumsum(mode, ATTR_PRICE, cum_price)
         self.has_parameters = True
 
     async def async_update_collects(self) -> None:

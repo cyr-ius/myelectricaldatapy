@@ -36,6 +36,11 @@ dev = [
     "prek",
     "ruff",
     "yamllint",
+    "pytest",
+    "pytest-asyncio",
+    "python-typing-update",
+    "typing_extensions",
+    "freezegun"
 ]
 
 [project.urls]
@@ -46,11 +51,11 @@ Homepage = "https://github.com/cyr-ius/myelectricaldatapy"
 [tool.setuptools]
 platforms = ["any"]
 
+[tool.setuptools.packages.find]
+exclude = ["node_modules*"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-
-[tool.ruff.lint.flake8-pytest-style]
-fixture-parentheses = false
 
 [tool.ruff.lint.isort]
 force-sort-within-sections = true

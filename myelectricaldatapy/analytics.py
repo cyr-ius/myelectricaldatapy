@@ -1,8 +1,5 @@
 """Class for analytics."""
 
-from __future__ import annotations
-
-from collections.abc import Collection
 from datetime import datetime as dt, timedelta
 import re
 from typing import Any
@@ -14,11 +11,11 @@ from .tz import LOCAL_TIMEZONE
 
 
 class EnedisAnalytics:
-    """Data analaytics."""
+    """Data analytics."""
 
     local_timezone = LOCAL_TIMEZONE
 
-    def __init__(self, data: Collection[Collection[str]]) -> None:
+    def __init__(self, data: Any) -> None:
         """Initialize Dataframe."""
         self.df = pd.DataFrame(data)
 
@@ -36,20 +33,25 @@ class EnedisAnalytics:
         tempo: dict[str, str] | None = None,
     ) -> Any:
         """Convert data to analyze."""
+
         cum_value = cum_value or {}
         cum_price = cum_price or {}
         step_hour = False
+
         if not self.df.empty:
             # Convert str to datetime
             try:
-                self.df.date = pd.to_datetime(self.df.date, format="%Y-%m-%d %H:%M:%S")
+                self.df["date"] = pd.to_datetime(
+                    self.df["date"], format="%Y-%m-%d %H:%M:%S"
+                )
             except ValueError:
-                self.df.date = pd.to_datetime(self.df.date, format="%Y-%m-%d")
-            self.df.date = self.df.date.dt.tz_localize(self.local_timezone)
+                self.df["date"] = pd.to_datetime(self.df["date"], format="%Y-%m-%d")
+
+            self.df["date"] = self.df["date"].dt.tz_localize(self.local_timezone)
 
             if convertUTC:
-                self.df.date = pd.to_datetime(
-                    self.df.date, utc=True, format="%Y-%m-%d %H:%M:%S"
+                self.df["date"] = pd.to_datetime(
+                    self.df["date"], utc=True, format="%Y-%m-%d %H:%M:%S"
                 )
 
             # Subtract 1 minute at hour
@@ -58,17 +60,17 @@ class EnedisAnalytics:
             if "interval_length" in self.df:
                 step_hour = True
                 self.df.loc[
-                    (self.df.date.dt.minute == 0),
+                    (self.df["date"].dt.minute == 0),
                     "date",
-                ] = self.df.date - timedelta(minutes=1)
+                ] = self.df["date"] - timedelta(minutes=1)
 
             if start_date:
                 dt_start_date = pd.to_datetime(start_date, format="%Y-%m-%d %H:%M:%S")
                 if dt_start_date.tzinfo is None:
                     dt_start_date = dt_start_date.tz_localize(self.local_timezone)
-                self.df = self.df[(self.df.date > dt_start_date)]
+                self.df = self.df[(self.df["date"] > dt_start_date)]
 
-            self.df.index = self.df.date
+            self.df.index = self.df["date"]
 
             # Add mark
             self.df["notes"] = ATTR_STANDARD
@@ -76,18 +78,20 @@ class EnedisAnalytics:
         if self.df.empty:
             return self.df.to_dict(orient="records")
 
-        self.df.interval_length = (
-            self.df.interval_length.transform(self._weighted_interval)
+        self.df["interval_length"] = (
+            self.df["interval_length"].transform(self._weighted_interval)
             if step_hour
             else 1
         )
 
         if convertKwh:
-            self.df.value = (
-                pd.to_numeric(self.df.value) / 1000 * self.df.interval_length
+            self.df["value"] = (
+                pd.to_numeric(self.df["value"]) / 1000 * self.df["interval_length"]
             )
         else:
-            self.df.value = pd.to_numeric(self.df.value) * self.df.interval_length
+            self.df["value"] = (
+                pd.to_numeric(self.df["value"]) * self.df["interval_length"]
+            )
 
         if intervals:
             self._get_data_interval(intervals)
@@ -136,7 +140,7 @@ class EnedisAnalytics:
 
     def _weighted_interval(self, interval: str) -> float | int:
         """Compute weighted."""
-        if interval and len(rslt := re.findall("PT([0-9]{2})M", interval)) == 1:
+        if interval and len(rslt := re.findall("PT([0-9]{1,2})M", interval)) == 1:
             return int(rslt[0]) / 60
         return 1
 
@@ -146,16 +150,18 @@ class EnedisAnalytics:
             # Convert str to datetime
             start = pd.to_datetime(interval[0], format="%H:%M:%S").time()
             end = pd.to_datetime(interval[1], format="%H:%M:%S").time()
-            # Mark
-            self.df.loc[
-                (self.df.date.dt.time > start) & (self.df.date.dt.time <= end),
-                "notes",
-            ] = ATTR_OFFPEAK
+            # Mark (handle ranges spanning midnight, e.g. 22:00:00 -> 06:00:00)
+            date_time = self.df["date"].dt.time
+            if start <= end:
+                mask = (date_time > start) & (date_time <= end)
+            else:
+                mask = (date_time > start) | (date_time <= end)
+            self.df.loc[mask, "notes"] = ATTR_OFFPEAK
 
         return self.df
 
-    def _set_tempo_days(self, tempo: dict[str, str]) -> pd.DataFrame:
+    def _set_tempo_days(self, tempo: dict[str, str]) -> None:
         """Add columns with tempo day."""
         for str_date, value in tempo.items():
             dt_date = pd.to_datetime(str_date, format="%Y-%m-%d")
-            self.df.loc[(self.df.date.dt.date == dt_date.date()), "tempo"] = value
+            self.df.loc[(self.df["date"].dt.date == dt_date.date()), "tempo"] = value

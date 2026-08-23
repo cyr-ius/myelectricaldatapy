@@ -1,7 +1,5 @@
 """Class for Enedis Authentication (http://www.myelectricaldata.fr)."""
 
-from __future__ import annotations
-
 import asyncio
 import json
 import logging
@@ -38,6 +36,7 @@ class EnedisAuth:
         kwargs["headers"].update(
             {"Content-Type": "application/json", "Authorization": self.token}
         )
+        contents = b""
 
         try:
             async with asyncio.timeout(self.timeout):
@@ -49,11 +48,11 @@ class EnedisAuth:
             raise TimeoutExceededError(
                 "Timeout occurred while connecting to MyElectricalData."
             ) from error
-        except ClientResponseError:
+        except ClientResponseError as error:
             message = contents.decode("utf8")
-            if "application/json" in response.headers.get("Content-Type", ""):
+            if "application/json" in (error.headers or {}).get("Content-Type", ""):
                 msg = json.loads(message)
-                if response.status == 409:
+                if error.status == 409:
                     raise LimitReached(msg.get("detail", msg))
                 raise EnedisException(msg.get("detail", msg))
             raise EnedisException({"message": message})

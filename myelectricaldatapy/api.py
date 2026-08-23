@@ -1,12 +1,10 @@
 """Class for Enedis Gateway (http://www.myelectricaldata.fr)."""
 
-from __future__ import annotations
-
 from collections.abc import Generator
 from datetime import date, datetime as dt, timedelta
 import logging
 import re
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any
 
 from aiohttp import ClientSession
 
@@ -15,14 +13,11 @@ from .const import DAILY_CONSUM, DAILY_PROD, DETAIL_CONSUM, DETAIL_PROD, TIMEOUT
 from .exceptions import EnedisException
 from .tz import LOCAL_TIMEZONE, as_local, local_now
 
-if TYPE_CHECKING:
-    from typing_extensions import Self
-
 _LOGGER = logging.getLogger(__name__)
 
 
 class Enedis:
-    """Get data of pdl."""
+    """Enedis API."""
 
     def __init__(
         self, token: str, session: ClientSession | None = None, timeout: int = TIMEOUT
@@ -176,7 +171,7 @@ class Enedis:
     async def _async_get_details(self, mode: str, pdl: str, start: dt, end: dt) -> Any:
         """Get production details. (max: 7 days)."""
         data = None
-        response = {}
+        response: dict[str, Any] | None = None
         raise_error = False
         for interval in list(self.date_range(start, end, 7)):
             start, end = interval
@@ -185,13 +180,16 @@ class Enedis:
                     response = await self.async_fetch_datas(mode, pdl, start, end)
             except EnedisException as error:
                 raise_error = True
+                response = None
                 _LOGGER.error(error)
 
+            if response is None:
+                continue
             new_data = response.get("meter_reading", {}).get("interval_reading")
-            if response is None or new_data is None:
+            if new_data is None:
                 continue
             elif data is None:
-                data = cast(dict[str, Any], response)
+                data = response
             else:
                 data["meter_reading"]["interval_reading"].extend(new_data)
 
@@ -210,14 +208,6 @@ class Enedis:
             yield (start, s_end)
             start = s_end
         yield (start, end)
-
-    async def __aenter__(self) -> Self:
-        """Asynchronous enter."""
-        return self
-
-    async def __aexit__(self, *_exc_info: object) -> None:
-        """Async exit."""
-        await self.async_close()
 
     async def async_close(self) -> None:
         """Close the session."""

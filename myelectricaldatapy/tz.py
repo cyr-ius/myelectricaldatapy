@@ -7,8 +7,6 @@ convention explicit and DST-safe, instead of relying on a fixed UTC offset
 captured once at import time.
 """
 
-from __future__ import annotations
-
 from datetime import datetime as dt, timezone as _timezone, tzinfo as _tzinfo
 import os
 from typing import cast
