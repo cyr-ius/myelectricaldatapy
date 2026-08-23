@@ -19,7 +19,6 @@ from .const import (
     ATTR_OFFPEAK,
     ATTR_PRICE,
     ATTR_PRICES,
-    ATTR_SERVICE,
     ATTR_STANDARD,
     ATTR_START,
     CONSUMPTION,
@@ -34,21 +33,6 @@ from .exceptions import EnedisException, LimitReached
 from .tz import as_local, local_now
 
 _LOGGER = logging.getLogger(__name__)
-
-MODES_SCH = vol.Schema(
-    {
-        vol.Optional(CONSUMPTION): {
-            vol.Required(ATTR_SERVICE): str,
-            vol.Optional(ATTR_START): dt,
-            vol.Optional(ATTR_END): dt,
-        },
-        vol.Optional(PRODUCTION): {
-            vol.Required(ATTR_SERVICE): str,
-            vol.Optional(ATTR_START): dt,
-            vol.Optional(ATTR_END): dt,
-        },
-    }
-)
 
 PRICE_SCH = vol.Schema(
     {

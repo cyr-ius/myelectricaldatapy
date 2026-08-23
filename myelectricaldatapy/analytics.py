@@ -6,7 +6,7 @@ from typing import Any
 
 import pandas as pd
 
-from .const import ATTR_OFFPEAK, ATTR_STANDARD
+from .const import ATTR_OFFPEAK, ATTR_STANDARD, TEMPO_DAYS
 from .tz import LOCAL_TIMEZONE
 
 
@@ -112,7 +112,7 @@ class EnedisAnalytics:
             for mode, values in prices.items():
                 if isinstance(values, dict):
                     for offset, price in values.items():
-                        if tempo and offset in ["blue", "white", "red"]:
+                        if tempo and offset in TEMPO_DAYS:
                             self.df.loc[
                                 (self.df.notes == mode) & (self.df.tempo == offset),
                                 "price",
