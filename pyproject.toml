@@ -25,7 +25,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "Topic :: Home Automation",
 ]
-requires-python = ">=3.10.0"
+requires-python = ">=3.10"
 dependencies    = [
     "aiohttp>=3.8.1",
     "pandas>=2.0.2",
@@ -53,7 +53,7 @@ Homepage = "https://github.com/cyr-ius/myelectricaldatapy"
 platforms = ["any"]
 
 [tool.setuptools.packages.find]
-exclude = ["node_modules*"]
+exclude = ["node_modules*", "tests*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
