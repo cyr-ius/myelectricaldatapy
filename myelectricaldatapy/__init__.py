@@ -8,6 +8,7 @@ from .exceptions import (
     TimeoutExceededError,
 )
 from .mypdl import EnedisByPDL
+from .tz import get_local_timezone, set_local_timezone
 
 __all__ = [
     "Enedis",
@@ -16,4 +17,6 @@ __all__ = [
     "HttpRequestError",
     "LimitReached",
     "TimeoutExceededError",
+    "get_local_timezone",
+    "set_local_timezone",
 ]

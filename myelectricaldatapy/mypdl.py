@@ -1,7 +1,7 @@
 """Class for my PDL."""
 
 from collections.abc import Callable
-from datetime import date, datetime as dt, timedelta
+from datetime import date, datetime as dt, timedelta, tzinfo as _tzinfo
 import logging
 from typing import Any, Literal
 
@@ -30,7 +30,7 @@ from .const import (
     TIMEOUT,
 )
 from .exceptions import EnedisException, LimitReached
-from .tz import as_local, local_now
+from .tz import as_local, local_now, set_local_timezone
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -84,11 +84,21 @@ class EnedisByPDL:
         token: str,
         session: ClientSession | None = None,
         timeout: int = TIMEOUT,
+        timezone: _tzinfo | None = None,
     ) -> None:
-        """Initialize."""
+        """Initialize.
+
+        timezone: the timezone to interpret naive datetimes in (e.g. Home
+            Assistant's hass.config.time_zone / dt_util.get_default_time_zone()).
+            Defaults to the host machine's timezone, which has no reason to
+            match the consuming application's configured timezone.
+        """
         session = ClientSession() if session is None else session
         self._api: Enedis = Enedis(token, session, timeout)
         self.pdl = pdl
+        self._timezone = timezone
+        if timezone is not None:
+            set_local_timezone(timezone)
         self._connected: bool = False
         self._ecowatt_subs: bool = False
         self._maxpower_subs: bool = False
@@ -173,7 +183,7 @@ class EnedisByPDL:
         stats = {}
         for mode, params in self._params.items():
             data = params.get("data", {})
-            analytics = EnedisAnalytics(data)
+            analytics = EnedisAnalytics(data, timezone=self._timezone)
             resultat = analytics.get_data_analytics(
                 convertKwh=True,
                 convertUTC=False,

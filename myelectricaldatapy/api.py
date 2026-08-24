@@ -11,7 +11,7 @@ from aiohttp import ClientSession
 from .auth import EnedisAuth
 from .const import DAILY_CONSUM, DAILY_PROD, DETAIL_CONSUM, DETAIL_PROD, TIMEOUT
 from .exceptions import EnedisException
-from .tz import LOCAL_TIMEZONE, as_local, local_now
+from .tz import as_local, get_local_timezone, local_now
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -126,16 +126,17 @@ class Enedis:
         if await self.async_has_offpeak(pdl) is True:
             # Off-peak windows are defined in local wall-clock time, so a
             # start given in another timezone must be converted first.
-            start_time = as_local(start).astimezone(LOCAL_TIMEZONE).time()
+            local_timezone = get_local_timezone()
+            start_time = as_local(start).astimezone(local_timezone).time()
             for range_time in self.offpeaks:
                 starting = (
                     dt.strptime(range_time[0], "%HH%M")
-                    .replace(tzinfo=LOCAL_TIMEZONE)
+                    .replace(tzinfo=local_timezone)
                     .time()
                 )
                 ending = (
                     dt.strptime(range_time[1], "%HH%M")
-                    .replace(tzinfo=LOCAL_TIMEZONE)
+                    .replace(tzinfo=local_timezone)
                     .time()
                 )
                 if starting < start_time <= ending:

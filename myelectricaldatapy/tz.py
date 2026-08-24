@@ -30,14 +30,35 @@ def _resolve_local_timezone() -> _tzinfo:
 
 LOCAL_TIMEZONE = _resolve_local_timezone()
 
+_override_timezone: _tzinfo | None = None
+
+
+def get_local_timezone() -> _tzinfo:
+    """Return the timezone to use for interpreting naive datetimes.
+
+    Returns the timezone set via set_local_timezone(), if any, otherwise
+    falls back to LOCAL_TIMEZONE (the host machine's /etc/localtime). The
+    host's timezone has no reason to match the application embedding this
+    library, so a caller such as a Home Assistant integration should call
+    set_local_timezone() at startup with its own configured timezone (e.g.
+    hass.config.time_zone).
+    """
+    return _override_timezone or LOCAL_TIMEZONE
+
+
+def set_local_timezone(tz: _tzinfo) -> None:
+    """Override the timezone used to interpret naive datetimes."""
+    global _override_timezone
+    _override_timezone = tz
+
 
 def local_now() -> dt:
     """Return the current time, timezone-aware in the local zone."""
-    return dt.now(tz=LOCAL_TIMEZONE)
+    return dt.now(tz=get_local_timezone())
 
 
 def as_local(value: dt) -> dt:
     """Attach the local timezone to a naive datetime; pass aware ones through."""
     if value.tzinfo is None:
-        return value.replace(tzinfo=LOCAL_TIMEZONE)
+        return value.replace(tzinfo=get_local_timezone())
     return value

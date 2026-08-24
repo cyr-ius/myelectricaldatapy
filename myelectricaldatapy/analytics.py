@@ -1,23 +1,25 @@
 """Class for analytics."""
 
-from datetime import datetime as dt, timedelta
+from datetime import datetime as dt, timedelta, tzinfo as _tzinfo
 import re
 from typing import Any
 
 import pandas as pd
 
 from .const import ATTR_OFFPEAK, ATTR_STANDARD, TEMPO_DAYS
-from .tz import LOCAL_TIMEZONE
+from .tz import get_local_timezone
 
 
 class EnedisAnalytics:
     """Data analytics."""
 
-    local_timezone = LOCAL_TIMEZONE
-
-    def __init__(self, data: Any) -> None:
+    def __init__(self, data: Any, timezone: _tzinfo | None = None) -> None:
         """Initialize Dataframe."""
         self.df = pd.DataFrame(data)
+        # Resolved per instance (not at import/class-definition time) so a
+        # timezone set later via tz.set_local_timezone(), or passed here
+        # explicitly, is honored.
+        self.local_timezone = timezone or get_local_timezone()
 
     def get_data_analytics(
         self,
