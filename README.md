@@ -41,6 +41,30 @@ $ python setup.py install
 - async_load (start: datetime, end: datetime) Return None - Load Data in power_Data attribute
 - async_refresh Return None - Refresh power_Data , tempo_day and ecowatt attributes.
 
+## Timezone
+
+Enedis/RTE APIs return naive timestamps that represent local wall-clock time. This
+library needs to know which timezone that is in order to compute things like
+off-peak hours or hourly statistics correctly.
+
+By default it falls back to the timezone of the host machine running the code
+(`/etc/localtime`), but that has no reason to match the timezone your
+application is actually configured for (e.g. Home Assistant's
+`hass.config.time_zone`). Pass it explicitly to avoid a fixed-offset shift in
+the reported times:
+
+```python
+api = EnedisByPDL(token=TOKEN, pdl=PDL, timezone=ZoneInfo("Europe/Paris"))
+```
+
+Alternatively, set it once globally for every instance:
+
+```python
+from myelectricaldatapy import set_local_timezone
+
+set_local_timezone(ZoneInfo("Europe/Paris"))
+```
+
 ## Get started
 
 ```python
