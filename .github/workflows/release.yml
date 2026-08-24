@@ -25,11 +25,3 @@ jobs:
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
           token: ${{ secrets.GITHUB_TOKEN }}
-  publish:
-    needs: release
-    permissions:
-      contents: write
-      packages: write
-      id-token: write
-    if: ${{ ! contains(github.ref_name, '-') }}
-    uses: ./.github/workflows/python-publish.yml
