@@ -10,21 +10,27 @@ from freezegun import freeze_time
 import pytest
 
 import myelectricaldatapy
-from myelectricaldatapy import Enedis, EnedisByPDL, EnedisException, LimitReached
+from myelectricaldatapy import (
+    DETAIL_CONSUM,
+    Enedis,
+    EnedisByPDL,
+    EnedisException,
+    LimitReached,
+)
 from myelectricaldatapy.tz import LOCAL_TIMEZONE, local_now
 
 from .consts import PDL, TOKEN
 
 
 @freeze_time("2023-01-23")
-async def test_ecowatt(mock_enedis: Mock) -> None:  # pylint: disable=unused-argument
+async def test_ecowatt(mock_enedis: Mock) -> None:
     """Test get ecowatt."""
     api = Enedis(token=TOKEN, session=ClientSession())
     resultat = await api.async_get_ecowatt()
     assert resultat["2023-01-22"]["value"] == 1
 
     mypdl = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
-    mypdl.ecowatt_subscription(True)
+    mypdl.set_ecowatt_subscription(True)
     await mypdl.async_update()
     assert mypdl.ecowatt_day["message"] == "Pas d’alerte."
 
@@ -41,15 +47,16 @@ async def test_invalid_ecowatt(mock_enedis: Mock, mock_ecowatt: bool) -> None:
 
 
 @freeze_time("2023-3-3")
-async def test_tempoday(mock_enedis: Mock) -> None:  # pylint: disable=unused-argument
+async def test_tempoday(mock_enedis: Mock) -> None:
     """Test get tempo day."""
     api = Enedis(token=TOKEN, session=ClientSession())
     resultat = await api.async_get_tempo()
     assert resultat["2023-03-01"] == "blue"
 
-    mypdl = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
-    mypdl.set_collects("consumption_load_curve")
-    mypdl.tempo_subscription(True)
+    mypdl = EnedisByPDL(
+        pdl=PDL, token=TOKEN, session=ClientSession(), subscription="tempo"
+    )
+    mypdl.set_data_fetch(DETAIL_CONSUM)
     await mypdl.async_update()
     resultat = mypdl.stats["consumption"]
     assert mypdl.tempo_day == "blue"
@@ -139,7 +146,7 @@ async def test_fetch_data(mock_detail) -> None:
     ):
         api = Enedis(token=TOKEN, session=ClientSession())
         resultat = await api.async_fetch_datas(
-            service="comsumption_load_curve",
+            service=DETAIL_CONSUM,
             pdl=PDL,
             start=dt.strptime("2022-12-30", "%Y-%m-%d").replace(tzinfo=LOCAL_TIMEZONE),
             end=dt.strptime("2022-12-31", "%Y-%m-%d").replace(tzinfo=LOCAL_TIMEZONE),
@@ -164,7 +171,7 @@ async def test_force_refresh(
         myelectricaldatapy.Enedis, "async_valid_access", return_value=access
     ):
         api = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
-        api.set_collects("consumption_load_curve")
+        api.set_data_fetch(DETAIL_CONSUM)
         await api.async_update()
         save_refresh = api.last_refresh
         await api.async_update()
@@ -183,13 +190,13 @@ async def test_exception(
         side_effect=LimitReached(500, {"detail": "Limit reached"}),
     ):
         api = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
-        api.set_collects("consumption_load_curve")
+        api.set_data_fetch(DETAIL_CONSUM)
         try:
             await api.async_update()
         except EnedisException:
             pass
         assert api.last_access is not None
-        assert len(api.access) == 0
+        assert api.access is None
 
     with patch.object(
         myelectricaldatapy.Enedis,
@@ -197,7 +204,7 @@ async def test_exception(
         side_effect=LimitReached(500, {"detail": "Limit reached"}),
     ):
         api = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
-        api.set_collects("consumption_load_curve")
+        api.set_data_fetch(DETAIL_CONSUM)
         try:
             await api.async_update()
         except LimitReached:
@@ -211,8 +218,8 @@ async def test_exception(
         side_effect=EnedisException(500, {"detail": "Error"}),
     ):
         api = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
-        api.set_collects("consumption_load_curve")
-        api.set_collects("daily_production")
+        api.set_data_fetch(DETAIL_CONSUM)
+        api.set_data_fetch("daily_production")
         try:
             await api.async_update()
             await api.async_update()

@@ -9,8 +9,9 @@ from typing import Any
 from aiohttp import ClientSession
 
 from .auth import EnedisAuth
-from .const import DAILY_CONSUM, DAILY_PROD, DETAIL_CONSUM, DETAIL_PROD, TIMEOUT
+from .const import DAILY_CONSUM, DAILY_PROD, DETAIL_CONSUM, DETAIL_PROD
 from .exceptions import EnedisException
+from .types import Service
 from .tz import as_local, get_local_timezone, local_now
 
 _LOGGER = logging.getLogger(__name__)
@@ -20,7 +21,7 @@ class Enedis:
     """Enedis API."""
 
     def __init__(
-        self, token: str, session: ClientSession | None = None, timeout: int = TIMEOUT
+        self, token: str, session: ClientSession | None = None, timeout: int = 30
     ) -> None:
         """Initialize."""
         session = session or ClientSession()
@@ -30,15 +31,9 @@ class Enedis:
         self.last_access: date | None = None
 
     async def async_fetch_datas(
-        self, service: str, pdl: str, start: dt | None = None, end: dt | None = None
+        self, service: Service, pdl: str, start: dt | None = None, end: dt | None = None
     ) -> Any:
-        """Retrieve date from service.
-
-        service:    contracts, identity, contact, addresses,
-                    daily_consumption_max_power,
-                    daily_consumption, daily_production,
-                    consumption_load_curve, production_load_curve
-        """
+        """Retrieve date from service."""
         self.last_access = local_now()
         path_range = ""
         if start and end:
@@ -169,7 +164,9 @@ class Enedis:
             "daily_consumption_max_power", pdl, start, end
         )
 
-    async def _async_get_details(self, mode: str, pdl: str, start: dt, end: dt) -> Any:
+    async def _async_get_details(
+        self, service: Service, pdl: str, start: dt, end: dt
+    ) -> Any:
         """Get production details. (max: 7 days)."""
         data = None
         response: dict[str, Any] | None = None
@@ -178,7 +175,7 @@ class Enedis:
             start, end = interval
             try:
                 if raise_error is False:
-                    response = await self.async_fetch_datas(mode, pdl, start, end)
+                    response = await self.async_fetch_datas(service, pdl, start, end)
             except EnedisException as error:
                 raise_error = True
                 response = None

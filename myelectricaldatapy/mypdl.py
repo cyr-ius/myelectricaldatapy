@@ -6,7 +6,6 @@ import logging
 from typing import Any, Literal
 
 from aiohttp import ClientSession
-import voluptuous as vol
 
 from .analytics import EnedisAnalytics
 from .api import Enedis
@@ -15,57 +14,81 @@ from .const import (
     ATTR_CUM_VALUE,
     ATTR_END,
     ATTR_FN,
+    ATTR_HPHC,
     ATTR_INTERVALS,
     ATTR_OFFPEAK,
     ATTR_PRICE,
     ATTR_PRICES,
     ATTR_STANDARD,
     ATTR_START,
+    ATTR_TEMPO,
     CONSUMPTION,
     DAILY_CONSUM,
     DAILY_PROD,
+    DEFAULT_SUBSCRIPTION,
     DETAIL_CONSUM,
     DETAIL_PROD,
     PRODUCTION,
-    TIMEOUT,
+    SUBSCRIPTIONS,
 )
 from .exceptions import EnedisException, LimitReached
+from .types import Cum, EnergyCollect, Mode, Prices, Subscription
 from .tz import as_local, local_now, set_local_timezone
 
 _LOGGER = logging.getLogger(__name__)
 
-PRICE_SCH = vol.Schema(
-    {
-        vol.Required(ATTR_STANDARD): {
-            vol.Required(ATTR_PRICE): vol.Any(int, float),
-        },
-        vol.Optional(ATTR_OFFPEAK): {
-            vol.Required(ATTR_PRICE): vol.Any(int, float),
-        },
-    }
-)
+STANDARD_KEYS = (ATTR_PRICE,)
+TEMPO_KEYS = ("blue", "white", "red")
 
-PRICE_TEMPO_SCH = vol.Schema(
-    {
-        vol.Required(ATTR_STANDARD): {
-            vol.Required("blue"): vol.Any(int, float),
-            vol.Required("white"): vol.Any(int, float),
-            vol.Required("red"): vol.Any(int, float),
-        },
-        vol.Optional(ATTR_OFFPEAK): {
-            vol.Required("blue"): vol.Any(int, float),
-            vol.Required("white"): vol.Any(int, float),
-            vol.Required("red"): vol.Any(int, float),
-        },
-    }
-)
 
-CUM_SCH = vol.Schema(
-    {
-        vol.Required(ATTR_STANDARD): vol.Any(int, float),
-        vol.Optional(ATTR_OFFPEAK): vol.Any(int, float),
-    }
-)
+class FormatError(ValueError):
+    """Raised when a user-provided mapping does not match the expected format."""
+
+
+def _is_number(value: Any) -> bool:
+    """Return True for an int or a float (but not a bool)."""
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _check_price_group(group: Any, keys: tuple[str, ...], name: str) -> None:
+    """Validate one price group (``standard`` or ``offpeak``)."""
+    if not isinstance(group, dict):
+        raise FormatError(f"'{name}' must be a mapping")
+    if missing := [key for key in keys if key not in group]:
+        raise FormatError(f"'{name}' is missing required keys {missing}")
+    if extra := [key for key in group if key not in keys]:
+        raise FormatError(f"'{name}' has unexpected keys {extra}")
+    if invalid := [key for key in keys if not _is_number(group[key])]:
+        raise FormatError(f"'{name}' values must be numbers {invalid}")
+
+
+def validate_prices(prices: Any) -> None:
+    """Validate a prices mapping and return the detected format."""
+    if not isinstance(prices, dict):
+        raise FormatError("prices must be a mapping")
+    if ATTR_STANDARD not in prices:
+        raise FormatError(f"'{ATTR_STANDARD}' is required")
+    if extra := [key for key in prices if key not in (ATTR_STANDARD, ATTR_OFFPEAK)]:
+        raise FormatError(f"unexpected keys {extra}")
+    standard = prices[ATTR_STANDARD]
+    is_tempo = isinstance(standard, dict) and "blue" in standard
+    keys = TEMPO_KEYS if is_tempo else STANDARD_KEYS
+    _check_price_group(standard, keys, ATTR_STANDARD)
+    if ATTR_OFFPEAK in prices:
+        _check_price_group(prices[ATTR_OFFPEAK], keys, ATTR_OFFPEAK)
+
+
+def validate_cumsum(cum_sum: Any) -> None:
+    """Validate a cumulative summary mapping."""
+    if not isinstance(cum_sum, dict):
+        raise FormatError("cumulative summary must be a mapping")
+    if ATTR_STANDARD not in cum_sum:
+        raise FormatError(f"'{ATTR_STANDARD}' is required")
+    for key, value in cum_sum.items():
+        if key not in (ATTR_STANDARD, ATTR_OFFPEAK):
+            raise FormatError(f"unexpected key '{key}'")
+        if not _is_number(value):
+            raise FormatError(f"'{key}' must be a number")
 
 
 class EnedisByPDL:
@@ -82,8 +105,9 @@ class EnedisByPDL:
         self,
         pdl: str,
         token: str,
+        subscription: Subscription = "standard",
         session: ClientSession | None = None,
-        timeout: int = TIMEOUT,
+        timeout: int = 30,
         timezone: _tzinfo | None = None,
     ) -> None:
         """Initialize.
@@ -97,30 +121,30 @@ class EnedisByPDL:
         self._api: Enedis = Enedis(token, session, timeout)
         self.pdl = pdl
         self._timezone = timezone
-        if timezone is not None:
-            set_local_timezone(timezone)
         self._connected: bool = False
         self._ecowatt_subs: bool = False
         self._maxpower_subs: bool = False
-        self._off_subs: bool = False
-        self._params: dict[str, dict[str, Any]] = {}
-        self._tempo_subs: bool = False
-        self.access: dict[str, Any] = {}
-        self.address: dict[str, Any] = {}
-        self.contract: dict[str, Any] = {}
-        self.ecowatt: dict[str, Any] = {}
+        self._params: dict[Mode, dict[str, Any]] = {}
+        self.subscription: Subscription = subscription
+        self.access: dict[str, Any] | None = None
+        self.address: dict[str, Any] | None = None
+        self.contract: dict[str, Any] | None = None
+        self.ecowatt: dict[str, Any] | None = None
         self.has_collected: bool = False
         self.has_parameters: bool = False
         self.intervals: list[tuple[str, str]] = []
         self.last_access: dt = local_now()
         self.last_refresh: date | None = None
-        self.max_power: dict[str, Any] = {}
-        self.tempo: dict[str, Any] = {}
+        self.max_power: dict[str, Any] | None = None
+        self.tempo: dict[str, Any] | None = None
+
+        if timezone is not None:
+            set_local_timezone(timezone)
 
     @property
     def is_connected(self) -> bool:
         """Connect state."""
-        return self.access.get("valid", False) is True
+        return self.access is not None and (self.access.get("valid", False) is True)
 
     @property
     def has_intervals(self) -> bool:
@@ -130,12 +154,17 @@ class EnedisByPDL:
     @property
     def has_tempo_subscription(self) -> bool:
         """Tempo subscription status."""
-        return self._tempo_subs
+        return self.subscription == ATTR_TEMPO
 
     @property
     def has_offpeak_hours_subscription(self) -> bool:
         """Offpeak hours subscription status."""
-        return self._off_subs
+        return self.subscription == ATTR_HPHC
+
+    @property
+    def has_standard_subscription(self) -> bool:
+        """Offpeak hours subscription status."""
+        return self.subscription == ATTR_STANDARD
 
     @property
     def has_ecowatt_subscription(self) -> bool:
@@ -148,39 +177,39 @@ class EnedisByPDL:
         return self._maxpower_subs
 
     @property
-    def subscription(self) -> Literal["hphc", "tempo", "standard"]:
-        if self.has_tempo_subscription:
-            return "tempo"
-        if self.has_offpeak_hours_subscription:
-            return "hphc"
-        return "standard"
-
-    @property
-    def ecowatt_day(self) -> Any:
+    def ecowatt_day(self) -> dict[str, Any] | None:
         """ecowatt."""
         str_date = local_now().strftime("%Y-%m-%d")
-        return self.ecowatt.get(str_date, {})
+        return self.ecowatt.get(str_date) if self.ecowatt is not None else None
 
     @property
     def tempo_day(self) -> str | None:
         """Tempo day."""
         str_date = local_now().strftime("%Y-%m-%d")
-        return self.tempo.get(str_date)
+        return self.tempo.get(str_date) if self.tempo is not None else None
 
     @property
-    def prod_prices(self) -> dict[str, Any] | None:
+    def prod_prices(self) -> Prices | None:
         """Production resel price."""
-        return self._params[PRODUCTION].get(ATTR_PRICES)
+        return (
+            self._params[PRODUCTION].get(ATTR_PRICES)
+            if self._params is not None
+            else None
+        )
 
     @property
-    def consum_prices(self) -> dict[str, Any] | None:
-        """Offpeak hours prices."""
-        return self._params[CONSUMPTION].get(ATTR_PRICES)
+    def consum_prices(self) -> Prices | None:
+        """Consumption prices."""
+        return (
+            self._params[CONSUMPTION].get(ATTR_PRICES)
+            if self._params is not None
+            else None
+        )
 
     @property
     def stats(self) -> dict[str, Any]:
         """Statistics."""
-        stats = {}
+        stats: dict[str, Any] = {}
         for mode, params in self._params.items():
             data = params.get("data", {})
             analytics = EnedisAnalytics(data, timezone=self._timezone)
@@ -206,16 +235,16 @@ class EnedisByPDL:
         end = local_now() + timedelta(days=1)
 
         if force_refresh or (self.last_access.date() != local_now().date()):
-            self.contract.clear()
-            self.contract.clear()
-            self.address.clear()
-            self.ecowatt.clear()
-            self.max_power.clear()
+            self.access = None
+            self.contract = None
+            self.address = None
+            self.ecowatt = None
+            self.max_power = None
             self.has_collected = False
 
         try:
             self.access = await self._api.async_valid_access(self.pdl)
-            if self.access.get("quota_reached", False):
+            if self.access is not None and self.access.get("quota_reached", False):
                 detail = self.access.get("information", "Quota reached")
                 raise LimitReached(409, {"detail": detail})
 
@@ -250,99 +279,65 @@ class EnedisByPDL:
         finally:
             self.last_access = local_now()
 
-    def tempo_subscription(self, activate: bool = False) -> None:
-        """Enable or Disable Tempo Subscription."""
-        self._off_subs = False
-        self._tempo_subs = activate is True
-
-    def offpeak_subscription(self, activate: bool = False) -> None:
-        """Enable or Disable Offpeak Hours Subscription."""
-        self._tempo_subs = False
-        self._off_subs = activate is True
-
-    def ecowatt_subscription(self, activate: bool = False) -> None:
+    def set_ecowatt_subscription(self, activate: bool = False) -> None:
         """Enable or Disable Ecowatt Subscription."""
         self._ecowatt_subs = activate is True
 
-    def maxpower_subscription(self, activate: bool = False) -> None:
+    def set_maxpower_subscription(self, activate: bool = False) -> None:
         """Enable or Disable Max power Subscription."""
         self._maxpower_subs = activate is True
 
-    def _set_intervals(self, mode: str, intervals: list[tuple[str, str]]) -> None:
+    def _set_intervals(self, mode: Mode, intervals: list[tuple[str, str]]) -> None:
         """Set intervals."""
         if isinstance(intervals, list):
             self.intervals = intervals
             self._params[mode].update({ATTR_INTERVALS: intervals})
 
-    def _set_prices(self, mode: str, prices: dict[str, Any]) -> None:
-        """Set intervals.
-
-        prices = {
-            "standard":{"price":[float]},
-            "offpeak":{"price":[float]}
-        }
-        or
-        prices = {
-            "standard":{"blue":[float],"white":[float],"red":[float]},
-            "offpeak":{"blue":[float],"white":[float],"red":[float]}
-        }
-        """
+    def _set_prices(self, mode: Mode, prices: Prices) -> None:
+        """Set prices."""
         try:
-            validate = PRICE_SCH(prices)
-        except vol.Error:
-            try:
-                validate = PRICE_TEMPO_SCH(prices)
-            except vol.Error as error:
-                _LOGGER.error("Format is incorrect (%s)", error)
-            else:
-                self.tempo_subscription(True)
-                self._params[mode].update({ATTR_PRICES: validate})
-        else:
-            self.offpeak_subscription(True)
-            self._params[mode].update({ATTR_PRICES: validate})
-
-    def _set_cumsum(self, mode: str, form: str, cum_sum: dict[str, Any]) -> None:
-        """Set cumulative summary.
-
-        mode: "production" or "consumption"
-        format: "value" or "price"
-        cum_sum = {"standard":[float], "offpeak":[float]}
-        """
-        try:
-            validate = CUM_SCH(cum_sum)
-        except vol.Error as error:
+            validate_prices(prices)
+        except FormatError as error:
             _LOGGER.error("Format is incorrect (%s)", error)
-        else:
-            self._params[mode].update({f"cum_{form}".lower(): validate})
+            return
 
-    def set_collects(
+        self._params[mode].update({ATTR_PRICES: prices})
+
+    def _set_cumsum(
+        self, mode: Mode, form: Literal["value", "price"], cum_sum: Cum
+    ) -> None:
+        """Set cumulative summary."""
+        try:
+            validate_cumsum(cum_sum)
+        except FormatError as error:
+            _LOGGER.error("Format is incorrect (%s)", error)
+            return
+
+        self._params[mode].update({f"cum_{form}".lower(): cum_sum})
+
+    def _set_subscription(self, sub: Subscription) -> None:
+        """Set subscription contract."""
+        self._subscription = sub if sub in SUBSCRIPTIONS else DEFAULT_SUBSCRIPTION
+
+    def set_data_fetch(
         self,
-        service: str,
+        service: EnergyCollect,
         start: dt | None = None,
         end: dt | None = None,
         intervals: list[tuple[str, str]] | None = None,
-        prices: dict[str, Any] | None = None,
-        cum_value: dict[str, Any] | None = None,
-        cum_price: dict[str, Any] | None = None,
+        prices: Prices | None = None,
+        cum_value: Cum | None = None,
+        cum_price: Cum | None = None,
     ) -> None:
-        """Set parameters for data collect.
+        """Set parameters for data fetching.
 
-        service: "daily_production" or "daily_consumption" or "detail_production" or "detail_consumption"
+        service: type of data collected
         start: date of begin to collect data
         end: date of end to collect data
         intervals: offpeak hours range - ex: [("01:00","05:00"),("12:00","14:00")]
         prices: price for standard interval and offpeak interval
-            ex: {
-                    "standard": [float], "offpeak": [float]
-                }
-            ex: {
-                    "standard":{"blue":[float],"white":[float],"red":[float]},
-                    "offpeak":{"blue":[float],"white":[float],"red":[float]}
-                }
         cum_sum: price of start
-            ex: {"standard":[float], "offpeak":[float]}
         cum_price:
-            ex: {"standard":[float], "offpeak":[float]}
         """
         funcs: dict[str, Callable[..., Any]] = {
             DAILY_PROD: self._api.async_get_daily_production,
@@ -351,11 +346,14 @@ class EnedisByPDL:
             DETAIL_CONSUM: self._api.async_get_details_consumption,
         }
         days = 1095 if service in [DAILY_PROD, DAILY_CONSUM] else 7
-        mode = CONSUMPTION if service in [DAILY_CONSUM, DETAIL_CONSUM] else PRODUCTION
+        mode: Mode = (
+            CONSUMPTION if service in [DAILY_CONSUM, DETAIL_CONSUM] else PRODUCTION
+        )
         func = funcs[service]
         dt_start = as_local(start) if start else local_now() - timedelta(days=days)
         dt_end = as_local(end) if end else local_now() + timedelta(days=1)
         self._params[mode] = {ATTR_FN: func, ATTR_START: dt_start, ATTR_END: dt_end}
+
         if intervals:
             self._set_intervals(mode, intervals)
         if prices:
@@ -364,43 +362,37 @@ class EnedisByPDL:
             self._set_cumsum(mode, "value", cum_value)
         if cum_price:
             self._set_cumsum(mode, ATTR_PRICE, cum_price)
+
         self.has_parameters = True
 
     async def async_update_collects(self) -> None:
-        """Update data to collect.
+        """Fetch data.
 
-        It is necessary to value the initial data via the method: set_collects.
+        It is necessary to value the initial data via the method: set_data_fetch.
         The execution of this method updates the property: stats.
         """
-        checked = True
-        self.has_collected = False
+
         for mode, attr in self._params.items():
             dataset = {}
             start = attr[ATTR_START]
             end = attr[ATTR_END]
             fn = attr[ATTR_FN]
-            try:
-                dataset = await fn(self.pdl, start, end)
-            except EnedisException as error:
-                checked = False
-                _LOGGER.error(error)
-            else:
-                if dataset is None:
-                    raise EnedisException("Data collection is empty")
-                data = dataset.get("meter_reading", {}).get("interval_reading", [])
-                if len(data) == 0:
-                    raise EnedisException("Data collection is empty")
-                checked = checked and len(data) > 0
-                self._params[mode].update({"data": data})
 
-            if mode == CONSUMPTION and self._tempo_subs:
+            dataset = await fn(self.pdl, start, end)
+
+            if dataset is None:
+                raise EnedisException("Data collection is empty")
+
+            data = dataset.get("meter_reading", {}).get("interval_reading", [])
+            if len(data) == 0:
+                raise EnedisException("Data collection is empty")
+
+            self._params[mode].update({"data": data})
+
+            if mode == CONSUMPTION and self.has_tempo_subscription:
                 self.tempo = await self._api.async_get_tempo(start, end)
 
-        self.has_collected = checked
-
-    async def __aexit__(self, *_exc_info: object) -> None:
-        """Async exit."""
-        await self.async_close()
+        self.has_collected = True
 
     async def async_close(self) -> None:
         """Close the session."""

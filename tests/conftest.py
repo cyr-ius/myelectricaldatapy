@@ -79,35 +79,9 @@ def mock_enedis(
             return_value=mock_detail,
         ),
         patch(
-            "myelectricaldatapy.Enedis.async_valid_access",
-            return_value=mock_access,
+            "myelectricaldatapy.Enedis.async_get_details_production",
+            return_value=mock_detail,
         ),
-        patch(
-            "myelectricaldatapy.Enedis.async_get_contract",
-            return_value=mock_contract,
-        ),
-        patch(
-            "myelectricaldatapy.Enedis.async_get_address",
-            return_value=mock_address,
-        ),
-        patch(
-            "myelectricaldatapy.Enedis.async_get_tempo",
-            return_value=mock_tempo,
-        ),
-        patch(
-            "myelectricaldatapy.Enedis.async_get_ecowatt",
-            return_value=mock_ecowatt,
-        ),
-    ):
-        yield AsyncMock()
-
-
-@pytest.fixture(name="mock_base")
-def mock_base(
-    mock_access, mock_contract, mock_address, mock_tempo, mock_ecowatt
-) -> Generator[AsyncMock, None, None]:
-    """Mock a successful connection."""
-    with (
         patch(
             "myelectricaldatapy.Enedis.async_valid_access",
             return_value=mock_access,

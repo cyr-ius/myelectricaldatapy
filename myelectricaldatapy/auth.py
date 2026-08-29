@@ -1,6 +1,7 @@
 """Class for Enedis Authentication (http://www.myelectricaldata.fr)."""
 
 import asyncio
+from collections.abc import Mapping
 import json
 import logging
 import socket
@@ -8,7 +9,6 @@ from typing import Any
 
 from aiohttp import ClientError, ClientResponseError, ClientSession
 
-from .const import TIMEOUT, URL
 from .exceptions import (
     EnedisException,
     HttpRequestError,
@@ -17,14 +17,13 @@ from .exceptions import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+URL = "https://myelectricaldata.fr"
 
 
 class EnedisAuth:
     """Class for Enedis Auth API."""
 
-    def __init__(
-        self, session: ClientSession, token: str, timeout: int = TIMEOUT
-    ) -> None:
+    def __init__(self, session: ClientSession, token: str, timeout: int = 30) -> None:
         """Init."""
         self.token = token
         self.timeout = timeout
@@ -50,7 +49,8 @@ class EnedisAuth:
             ) from error
         except ClientResponseError as error:
             message = contents.decode("utf8")
-            if "application/json" in (error.headers or {}).get("Content-Type", ""):
+            headers: Mapping[str, str] = error.headers or {}
+            if "application/json" in headers.get("Content-Type", ""):
                 msg = json.loads(message)
                 if error.status == 409:
                     raise LimitReached(msg.get("detail", msg))
