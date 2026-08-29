@@ -10,6 +10,7 @@ from aiohttp import ClientSession
 from .analytics import EnedisAnalytics
 from .api import Enedis
 from .const import (
+    ATTR_CONSUM,
     ATTR_CUM_PRICE,
     ATTR_CUM_VALUE,
     ATTR_END,
@@ -19,17 +20,19 @@ from .const import (
     ATTR_OFFPEAK,
     ATTR_PRICE,
     ATTR_PRICES,
+    ATTR_PROD,
     ATTR_STANDARD,
     ATTR_START,
     ATTR_TEMPO,
-    CONSUMPTION,
+    CONF_VALUE,
     DAILY_CONSUM,
     DAILY_PROD,
     DEFAULT_SUBSCRIPTION,
     DETAIL_CONSUM,
     DETAIL_PROD,
-    PRODUCTION,
     SUBSCRIPTIONS,
+    TEMPO_B,
+    TEMPO_DAYS,
 )
 from .exceptions import EnedisException, LimitReached
 from .types import Cum, EnergyCollect, Mode, Prices, Subscription
@@ -38,7 +41,6 @@ from .tz import as_local, local_now, set_local_timezone
 _LOGGER = logging.getLogger(__name__)
 
 STANDARD_KEYS = (ATTR_PRICE,)
-TEMPO_KEYS = ("blue", "white", "red")
 
 
 class FormatError(ValueError):
@@ -71,8 +73,8 @@ def validate_prices(prices: Any) -> None:
     if extra := [key for key in prices if key not in (ATTR_STANDARD, ATTR_OFFPEAK)]:
         raise FormatError(f"unexpected keys {extra}")
     standard = prices[ATTR_STANDARD]
-    is_tempo = isinstance(standard, dict) and "blue" in standard
-    keys = TEMPO_KEYS if is_tempo else STANDARD_KEYS
+    is_tempo = isinstance(standard, dict) and TEMPO_B in standard
+    keys = TEMPO_DAYS if is_tempo else STANDARD_KEYS
     _check_price_group(standard, keys, ATTR_STANDARD)
     if ATTR_OFFPEAK in prices:
         _check_price_group(prices[ATTR_OFFPEAK], keys, ATTR_OFFPEAK)
@@ -192,7 +194,7 @@ class EnedisByPDL:
     def prod_prices(self) -> Prices | None:
         """Production resel price."""
         return (
-            self._params[PRODUCTION].get(ATTR_PRICES)
+            self._params[ATTR_PROD].get(ATTR_PRICES)
             if self._params is not None
             else None
         )
@@ -201,7 +203,7 @@ class EnedisByPDL:
     def consum_prices(self) -> Prices | None:
         """Consumption prices."""
         return (
-            self._params[CONSUMPTION].get(ATTR_PRICES)
+            self._params[ATTR_CONSUM].get(ATTR_PRICES)
             if self._params is not None
             else None
         )
@@ -347,7 +349,7 @@ class EnedisByPDL:
         }
         days = 1095 if service in [DAILY_PROD, DAILY_CONSUM] else 7
         mode: Mode = (
-            CONSUMPTION if service in [DAILY_CONSUM, DETAIL_CONSUM] else PRODUCTION
+            ATTR_CONSUM if service in [DAILY_CONSUM, DETAIL_CONSUM] else ATTR_PROD
         )
         func = funcs[service]
         dt_start = as_local(start) if start else local_now() - timedelta(days=days)
@@ -359,7 +361,7 @@ class EnedisByPDL:
         if prices:
             self._set_prices(mode, prices)
         if cum_value:
-            self._set_cumsum(mode, "value", cum_value)
+            self._set_cumsum(mode, CONF_VALUE, cum_value)
         if cum_price:
             self._set_cumsum(mode, ATTR_PRICE, cum_price)
 
@@ -389,7 +391,7 @@ class EnedisByPDL:
 
             self._params[mode].update({"data": data})
 
-            if mode == CONSUMPTION and self.has_tempo_subscription:
+            if mode == ATTR_CONSUM and self.has_tempo_subscription:
                 self.tempo = await self._api.async_get_tempo(start, end)
 
         self.has_collected = True
