@@ -15,6 +15,7 @@ type ProductionCollect = Literal["production_load_curve", "daily_production"]
 type ConsumptionCollect = Literal["consumption_load_curve", "daily_consumption"]
 type EnergyCollect = ProductionCollect | ConsumptionCollect
 type Mode = Literal["consumption", "production"]
+type TempoLabels = Literal["blue", "white", "red"]
 
 type Service = (
     Literal[
@@ -57,9 +58,49 @@ class Cum(TypedDict):
     offpeak: float
 
 
+class TempoInfos(TypedDict):
+    days: dict[str, int]
+    prices: dict[str, float]
+
+
+class EcowattDay(TypedDict):
+    value: int
+    message: str
+    detail: dict[str, int]
+
+
+class ReadingType(TypedDict):
+    measurement_kind: str
+    measuring_period: str | None
+    unit: str
+    aggregate: str
+
+
+class IntervalReading(TypedDict):
+    value: str
+    date: str
+    interval_length: str | None
+    measure_type: str | None
+
+
+class MeterReading(TypedDict):
+    usage_point_id: str
+    start: str
+    end: str
+    quality: str
+    reading_type: ReadingType
+    interval_reading: IntervalReading
+
+
+class DataCollect(TypedDict):
+    meter_reading: MeterReading
+
+
 __all__ = [
     "ConsumptionCollect",
     "Cum",
+    "DataCollect",
+    "EcowattDay",
     "EnergyCollect",
     "Mode",
     "Prices",
@@ -67,5 +108,7 @@ __all__ = [
     "Service",
     "StandardPrice",
     "Subscription",
+    "TempoInfos",
+    "TempoLabels",
     "TempoPrice",
 ]

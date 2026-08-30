@@ -7,6 +7,7 @@ from typing import Any
 import pandas as pd
 
 from .const import ATTR_OFFPEAK, ATTR_STANDARD, TEMPO_DAYS
+from .types import TempoLabels
 from .tz import get_local_timezone
 
 
@@ -32,7 +33,7 @@ class EnedisAnalytics:
         cum_value: dict[str, Any] | None = None,
         cum_price: dict[str, Any] | None = None,
         prices: dict[str, Any] | None = None,
-        tempo: dict[str, str] | None = None,
+        tempo: dict[str, TempoLabels] | None = None,
     ) -> Any:
         """Convert data to analyze."""
 
@@ -162,7 +163,7 @@ class EnedisAnalytics:
 
         return self.df
 
-    def _set_tempo_days(self, tempo: dict[str, str]) -> None:
+    def _set_tempo_days(self, tempo: dict[str, TempoLabels]) -> None:
         """Add columns with tempo day."""
         for str_date, value in tempo.items():
             dt_date = pd.to_datetime(str_date, format="%Y-%m-%d")
