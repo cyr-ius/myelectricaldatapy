@@ -35,7 +35,7 @@ END_D = dt.strptime("2023-03-08", "%Y-%m-%d").replace(tzinfo=LOCAL_TIMEZONE)
 
 
 @freeze_time("2023-03-01")
-async def test_standard_daily_consumption(mock_enedis: Mock, session) -> None:  # pylint: disable=unused-argument
+async def test_standard_daily_consumption(mock_enedis: Mock, session) -> None:
     """Test standard consumption."""
     api = EnedisByPDL(pdl=PDL, token=TOKEN, session=session)
     api.set_data_fetch(DAILY_CONSUM)
