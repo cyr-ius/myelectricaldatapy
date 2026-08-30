@@ -35,7 +35,17 @@ from .const import (
     TEMPO_DAYS,
 )
 from .exceptions import EnedisException, LimitReached
-from .types import Cum, EnergyCollect, Mode, Prices, Subscription
+from .types import (
+    Cum,
+    DataCollect,
+    EcowattDay,
+    EnergyCollect,
+    Mode,
+    Prices,
+    Subscription,
+    TempoInfos,
+    TempoLabels,
+)
 from .tz import as_local, local_now, set_local_timezone
 
 _LOGGER = logging.getLogger(__name__)
@@ -127,18 +137,21 @@ class EnedisByPDL:
         self._ecowatt_subs: bool = False
         self._maxpower_subs: bool = False
         self._params: dict[Mode, dict[str, Any]] = {}
-        self.subscription: Subscription = subscription
+        self._subscription: Subscription = (
+            subscription if subscription in SUBSCRIPTIONS else DEFAULT_SUBSCRIPTION
+        )
         self.access: dict[str, Any] | None = None
         self.address: dict[str, Any] | None = None
         self.contract: dict[str, Any] | None = None
-        self.ecowatt: dict[str, Any] | None = None
+        self.ecowatt: dict[str, EcowattDay] | None = None
         self.has_collected: bool = False
         self.has_parameters: bool = False
         self.intervals: list[tuple[str, str]] = []
         self.last_access: dt = local_now()
         self.last_refresh: date | None = None
-        self.max_power: dict[str, Any] | None = None
-        self.tempo: dict[str, Any] | None = None
+        self.max_power: DataCollect | None = None
+        self.tempo: dict[str, TempoLabels] | None = None
+        self.tempo_infos: TempoInfos | None = None
 
         if timezone is not None:
             set_local_timezone(timezone)
@@ -156,17 +169,17 @@ class EnedisByPDL:
     @property
     def has_tempo_subscription(self) -> bool:
         """Tempo subscription status."""
-        return self.subscription == ATTR_TEMPO
+        return self._subscription == ATTR_TEMPO
 
     @property
     def has_offpeak_hours_subscription(self) -> bool:
         """Offpeak hours subscription status."""
-        return self.subscription == ATTR_HPHC
+        return self._subscription == ATTR_HPHC
 
     @property
     def has_standard_subscription(self) -> bool:
         """Offpeak hours subscription status."""
-        return self.subscription == ATTR_STANDARD
+        return self._subscription == ATTR_STANDARD
 
     @property
     def has_ecowatt_subscription(self) -> bool:
@@ -179,13 +192,13 @@ class EnedisByPDL:
         return self._maxpower_subs
 
     @property
-    def ecowatt_day(self) -> dict[str, Any] | None:
+    def ecowatt_day(self) -> EcowattDay | None:
         """ecowatt."""
         str_date = local_now().strftime("%Y-%m-%d")
         return self.ecowatt.get(str_date) if self.ecowatt is not None else None
 
     @property
-    def tempo_day(self) -> str | None:
+    def tempo_day(self) -> TempoLabels | None:
         """Tempo day."""
         str_date = local_now().strftime("%Y-%m-%d")
         return self.tempo.get(str_date) if self.tempo is not None else None
@@ -243,6 +256,7 @@ class EnedisByPDL:
             self.ecowatt = None
             self.max_power = None
             self.has_collected = False
+            self.tempo_infos = None
 
         try:
             self.access = await self._api.async_valid_access(self.pdl)
@@ -253,22 +267,22 @@ class EnedisByPDL:
             if self.is_connected is False:
                 raise EnedisException(200, {"detail": "Api access not valid"})
 
-            if not self.contract and self.has_collected is False:
+            if self.contract is None and self.has_collected is False:
                 try:
                     self.contract = await self._api.async_get_contract(self.pdl)
                 except EnedisException as error:
                     _LOGGER.warning(error)
 
-            if not self.address and self.has_collected is False:
+            if self.address is None and self.has_collected is False:
                 try:
                     self.address = await self._api.async_get_address(self.pdl)
                 except EnedisException as error:
                     _LOGGER.warning(error)
 
-            if not self.ecowatt and self._ecowatt_subs:
+            if self.ecowatt is None and self.has_ecowatt_subscription:
                 self.ecowatt = await self._api.async_get_ecowatt(start, end)
 
-            if not self.max_power and self._maxpower_subs:
+            if self.max_power is None and self.has_maxpower_subscription:
                 self.max_power = await self._api.async_get_max_power(
                     self.pdl, start, end
                 )
@@ -276,6 +290,13 @@ class EnedisByPDL:
             if self.has_parameters and self.has_collected is False:
                 await self.async_update_collects()
                 self.last_refresh = local_now()
+
+            if self.tempo_infos is None and self.has_tempo_subscription:
+                self.tempo_infos = {
+                    "days": await self._api.async_get_tempo_days(),
+                    "prices": await self._api.async_get_tempo_prices(),
+                }
+
         except EnedisException as error:
             raise error from error
         finally:
@@ -316,10 +337,6 @@ class EnedisByPDL:
             return
 
         self._params[mode].update({f"cum_{form}".lower(): cum_sum})
-
-    def _set_subscription(self, sub: Subscription) -> None:
-        """Set subscription contract."""
-        self._subscription = sub if sub in SUBSCRIPTIONS else DEFAULT_SUBSCRIPTION
 
     def set_data_fetch(
         self,
