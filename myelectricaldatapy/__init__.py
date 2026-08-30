@@ -3,9 +3,11 @@
 from .api import Enedis
 from .const import *
 from .exceptions import (
+    AnalyticsError,
     EnedisException,
     HttpRequestError,
     LimitReached,
+    PayloadError,
     TimeoutExceededError,
 )
 from .mypdl import EnedisByPDL
@@ -39,6 +41,7 @@ from .tz import get_local_timezone, set_local_timezone
 
 __all__ = [
     "AccessResponse",
+    "AnalyticsError",
     "ConsumptionCollect",
     "Contract",
     "Cum",
@@ -55,6 +58,7 @@ __all__ = [
     "LimitReached",
     "MeterReading",
     "Mode",
+    "PayloadError",
     "Prices",
     "ProductionCollect",
     "ReadingType",

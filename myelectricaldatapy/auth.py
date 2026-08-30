@@ -13,6 +13,7 @@ from .exceptions import (
     EnedisException,
     HttpRequestError,
     LimitReached,
+    PayloadError,
     TimeoutExceededError,
 )
 
@@ -48,21 +49,29 @@ class EnedisAuth:
                 "Timeout occurred while connecting to MyElectricalData."
             ) from error
         except ClientResponseError as error:
-            message = contents.decode("utf8")
+            message = contents.decode("utf8", errors="replace")
             headers: Mapping[str, str] = error.headers or {}
             if "application/json" in headers.get("Content-Type", ""):
-                msg = json.loads(message)
+                try:
+                    msg = json.loads(message)
+                except json.JSONDecodeError:
+                    raise EnedisException({"message": message}) from error
+                detail = msg.get("detail", msg) if isinstance(msg, Mapping) else msg
                 if error.status == 409:
-                    raise LimitReached(msg.get("detail", msg))
-                raise EnedisException(msg.get("detail", msg))
-            raise EnedisException({"message": message})
+                    raise LimitReached(detail) from error
+                raise EnedisException(detail) from error
+            raise EnedisException({"message": message}) from error
         except (ClientError, socket.gaierror) as error:
             raise HttpRequestError(
                 "Error occurred while communicating with MyElectricalData."
             ) from error
 
-        return (
-            await response.json()
-            if "application/json" in response.headers.get("Content-Type", "")
-            else await response.text()
-        )
+        if "application/json" not in response.headers.get("Content-Type", ""):
+            return await response.text()
+
+        try:
+            return await response.json()
+        except (ClientError, ValueError) as error:
+            raise PayloadError(
+                "Malformed JSON response from MyElectricalData."
+            ) from error

@@ -7,6 +7,7 @@ from typing import Any
 import pandas as pd
 
 from .const import ATTR_OFFPEAK, ATTR_STANDARD, TEMPO_DAYS
+from .exceptions import AnalyticsError, EnedisException
 from .types import TempoLabels
 from .tz import get_local_timezone
 
@@ -16,13 +17,57 @@ class EnedisAnalytics:
 
     def __init__(self, data: Any, timezone: _tzinfo | None = None) -> None:
         """Initialize Dataframe."""
-        self.df = pd.DataFrame(data)
+        try:
+            self.df = pd.DataFrame(data)
+        except Exception as error:  # normalized below
+            raise AnalyticsError(
+                f"Could not build a dataframe from the provided data: {error}"
+            ) from error
         # Resolved per instance (not at import/class-definition time) so a
         # timezone set later via tz.set_local_timezone(), or passed here
         # explicitly, is honored.
         self.local_timezone = timezone or get_local_timezone()
 
     def get_data_analytics(
+        self,
+        convertKwh: bool = False,
+        convertUTC: bool = False,
+        start_date: dt | None = None,
+        intervals: list[tuple[str, str]] | None = None,
+        groupby: bool = False,
+        summary: bool = False,
+        cum_value: dict[str, Any] | None = None,
+        cum_price: dict[str, Any] | None = None,
+        prices: dict[str, Any] | None = None,
+        tempo: dict[str, TempoLabels] | None = None,
+    ) -> Any:
+        """Convert data to analyze.
+
+        Any failure while crunching the dataframe is re-raised as
+        :class:`AnalyticsError` so callers only have to catch
+        :class:`EnedisException`.
+        """
+        try:
+            return self._get_data_analytics(
+                convertKwh=convertKwh,
+                convertUTC=convertUTC,
+                start_date=start_date,
+                intervals=intervals,
+                groupby=groupby,
+                summary=summary,
+                cum_value=cum_value,
+                cum_price=cum_price,
+                prices=prices,
+                tempo=tempo,
+            )
+        except EnedisException:
+            raise
+        except Exception as error:  # normalized below
+            raise AnalyticsError(
+                f"Failed to compute analytics from the provided dataset: {error}"
+            ) from error
+
+    def _get_data_analytics(
         self,
         convertKwh: bool = False,
         convertUTC: bool = False,

@@ -7,11 +7,11 @@ import re
 from typing import Any
 
 from aiohttp import ClientSession
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from .auth import EnedisAuth
 from .const import DAILY_CONSUM, DAILY_PROD, DETAIL_CONSUM, DETAIL_PROD
-from .exceptions import EnedisException
+from .exceptions import EnedisException, PayloadError
 from .types import (
     AccessResponse,
     Contract,
@@ -31,6 +31,20 @@ from .types import (
 from .tz import as_local, get_local_timezone, local_now
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _validate[ModelT: BaseModel](model: type[ModelT], raw: Any) -> ModelT:
+    """Validate ``raw`` against ``model``, wrapping schema errors.
+
+    Keeps every parsing failure inside the :class:`EnedisException` hierarchy so
+    consumers of the library only ever have to catch ``EnedisException``.
+    """
+    try:
+        return model.model_validate(raw)
+    except ValidationError as error:
+        raise PayloadError(
+            f"Unexpected {model.__name__} payload from MyElectricalData: {error}"
+        ) from error
 
 
 class Enedis:
@@ -63,8 +77,8 @@ class Enedis:
 
     async def async_valid_access(self, pdl: str) -> AccessResponse:
         """Return valid access."""
-        return AccessResponse.model_validate(
-            await self.async_fetch_datas("valid_access", pdl)
+        return _validate(
+            AccessResponse, await self.async_fetch_datas("valid_access", pdl)
         )
 
     async def async_has_access(self, pdl: str) -> bool:
@@ -87,8 +101,8 @@ class Enedis:
 
     async def async_get_contracts(self, pdl: str) -> CustomerResponse:
         """Return all contracts information."""
-        return CustomerResponse.model_validate(
-            await self.async_fetch_datas("contracts", pdl)
+        return _validate(
+            CustomerResponse, await self.async_fetch_datas("contracts", pdl)
         )
 
     async def async_get_address(self, pdl: str) -> UsagePoint | None:
@@ -102,8 +116,8 @@ class Enedis:
 
     async def async_get_addresses(self, pdl: str) -> CustomerResponse:
         """Return all addresses information."""
-        return CustomerResponse.model_validate(
-            await self.async_fetch_datas("addresses", pdl)
+        return _validate(
+            CustomerResponse, await self.async_fetch_datas("addresses", pdl)
         )
 
     async def async_get_tempo(
@@ -203,24 +217,24 @@ class Enedis:
 
     async def async_get_identity(self, pdl: str) -> IdentityResponse:
         """Get identity."""
-        return IdentityResponse.model_validate(
-            await self.async_fetch_datas("identity", pdl)
+        return _validate(
+            IdentityResponse, await self.async_fetch_datas("identity", pdl)
         )
 
     async def async_get_daily_consumption(
         self, pdl: str, start: dt, end: dt
     ) -> DataCollect:
         """Get daily consumption."""
-        return DataCollect.model_validate(
-            await self.async_fetch_datas(DAILY_CONSUM, pdl, start, end)
+        return _validate(
+            DataCollect, await self.async_fetch_datas(DAILY_CONSUM, pdl, start, end)
         )
 
     async def async_get_daily_production(
         self, pdl: str, start: dt, end: dt
     ) -> DataCollect:
         """Get daily production."""
-        return DataCollect.model_validate(
-            await self.async_fetch_datas(DAILY_PROD, pdl, start, end)
+        return _validate(
+            DataCollect, await self.async_fetch_datas(DAILY_PROD, pdl, start, end)
         )
 
     async def async_get_details_consumption(
@@ -237,8 +251,11 @@ class Enedis:
 
     async def async_get_max_power(self, pdl: str, start: dt, end: dt) -> DataCollect:
         """Get consumption max power."""
-        return DataCollect.model_validate(
-            await self.async_fetch_datas("daily_consumption_max_power", pdl, start, end)
+        return _validate(
+            DataCollect,
+            await self.async_fetch_datas(
+                "daily_consumption_max_power", pdl, start, end
+            ),
         )
 
     async def _async_get_details(
@@ -254,8 +271,9 @@ class Enedis:
             response: DataCollect | None = None
             try:
                 if raise_error is False:
-                    response = DataCollect.model_validate(
-                        await self.async_fetch_datas(service, pdl, start, end)
+                    response = _validate(
+                        DataCollect,
+                        await self.async_fetch_datas(service, pdl, start, end),
                     )
             except EnedisException as error:
                 raise_error = True

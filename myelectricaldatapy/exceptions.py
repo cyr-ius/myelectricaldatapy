@@ -10,8 +10,16 @@ class LimitReached(EnedisException):
 
 
 class TimeoutExceededError(EnedisException):
-    """Limit reached exception."""
+    """Timeout exceeded exception."""
 
 
 class HttpRequestError(EnedisException):
     """Http request error."""
+
+
+class PayloadError(EnedisException):
+    """Raised when an API payload cannot be decoded or does not match the schema."""
+
+
+class AnalyticsError(EnedisException):
+    """Raised when analytics computation fails on the provided dataset."""
