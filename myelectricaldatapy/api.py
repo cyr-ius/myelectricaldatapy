@@ -7,11 +7,27 @@ import re
 from typing import Any
 
 from aiohttp import ClientSession
+from pydantic import ValidationError
 
 from .auth import EnedisAuth
 from .const import DAILY_CONSUM, DAILY_PROD, DETAIL_CONSUM, DETAIL_PROD
 from .exceptions import EnedisException
-from .types import DataCollect, IntervalReading, Service
+from .types import (
+    AccessResponse,
+    Contract,
+    CustomerResponse,
+    DataCollect,
+    EcowattMapping,
+    EcowattResponse,
+    IdentityResponse,
+    Prices,
+    Service,
+    TempoDays,
+    TempoMapping,
+    TempoPrice,
+    TempoResponse,
+    UsagePoint,
+)
 from .tz import as_local, get_local_timezone, local_now
 
 _LOGGER = logging.getLogger(__name__)
@@ -24,6 +40,7 @@ class Enedis:
         self, token: str, session: ClientSession | None = None, timeout: int = 30
     ) -> None:
         """Initialize."""
+
         session = session or ClientSession()
         self.auth = EnedisAuth(session, token, timeout)
         self.async_request = self.auth.async_request
@@ -34,6 +51,7 @@ class Enedis:
         self, service: Service, pdl: str, start: dt | None = None, end: dt | None = None
     ) -> Any:
         """Retrieve date from service."""
+
         self.last_access = local_now()
         path_range = ""
         if start and end:
@@ -43,48 +61,54 @@ class Enedis:
         path = f"{service}/{pdl}{path_range}"
         return await self.async_request(path=path)
 
-    async def async_valid_access(self, pdl: str) -> Any:
+    async def async_valid_access(self, pdl: str) -> AccessResponse:
         """Return valid access."""
-        return await self.async_fetch_datas("valid_access", pdl)
+        return AccessResponse.model_validate(
+            await self.async_fetch_datas("valid_access", pdl)
+        )
 
     async def async_has_access(self, pdl: str) -> bool:
         """Check valid access."""
         access = await self.async_valid_access(pdl)
-        return access.get("valid", False) is True
+        return access.valid is True
 
-    async def async_get_contract(self, pdl: str) -> Any:
+    async def async_get_contract(self, pdl: str) -> Contract | None:
         """Return contract information."""
-        contract = {}
+        contract: Contract | None = None
         contracts = await self.async_get_contracts(pdl)
-        usage_points = contracts.get("customer", {}).get("usage_points", "")
-        for usage_point in usage_points:
-            if usage_point.get("usage_point", {}).get("usage_point_id") == pdl:
-                contract = usage_point.get("contracts", {})
-                if offpeak_hours := contract.get("offpeak_hours"):
-                    self.offpeaks = re.findall("(?:(\\w+)-(\\w+))+", offpeak_hours)
+        for usage_point in contracts.customer.usage_points:
+            if usage_point.usage_point.usage_point_id == pdl:
+                contract = usage_point.contracts
+                if contract and contract.offpeak_hours:
+                    self.offpeaks = re.findall(
+                        "(?:(\\w+)-(\\w+))+", contract.offpeak_hours
+                    )
         return contract
 
-    async def async_get_contracts(self, pdl: str) -> Any:
+    async def async_get_contracts(self, pdl: str) -> CustomerResponse:
         """Return all contracts information."""
-        return await self.async_fetch_datas("contracts", pdl)
+        return CustomerResponse.model_validate(
+            await self.async_fetch_datas("contracts", pdl)
+        )
 
-    async def async_get_address(self, pdl: str) -> Any:
+    async def async_get_address(self, pdl: str) -> UsagePoint | None:
         """Return address information."""
-        address = {}
-        addresses = await self.async_fetch_datas("addresses", pdl)
-        usage_points = addresses.get("customer", {}).get("usage_points", "")
-        for usage_point in usage_points:
-            if usage_point.get("usage_point", {}).get("usage_point_id") == pdl:
-                address = usage_point.get("usage_point")
+        address: UsagePoint | None = None
+        addresses = await self.async_get_addresses(pdl)
+        for usage_point in addresses.customer.usage_points:
+            if usage_point.usage_point.usage_point_id == pdl:
+                address = usage_point.usage_point
         return address
 
-    async def async_get_addresses(self, pdl: str) -> Any:
+    async def async_get_addresses(self, pdl: str) -> CustomerResponse:
         """Return all addresses information."""
-        return await self.async_fetch_datas("addresses", pdl)
+        return CustomerResponse.model_validate(
+            await self.async_fetch_datas("addresses", pdl)
+        )
 
     async def async_get_tempo(
         self, start: dt | None = None, end: dt | None = None
-    ) -> Any:
+    ) -> TempoMapping:
         """Return Tempo Day."""
         str_start = (
             start.strftime("%Y-%m-%d") if start else local_now().strftime("%Y-%m-%d")
@@ -94,19 +118,45 @@ class Enedis:
             if end
             else (local_now() + timedelta(days=1)).strftime("%Y-%m-%d")
         )
-        return await self.auth.async_request(path=f"rte/tempo/{str_start}/{str_end}")
+        raw = await self.auth.async_request(path=f"rte/tempo/{str_start}/{str_end}")
+        try:
+            return TempoResponse.validate_python(raw)
+        except ValidationError as error:
+            _LOGGER.debug("Unexpected tempo payload: %s (%s)", raw, error)
+            return {}
 
-    async def async_get_tempo_days(self) -> Any:
+    async def async_get_tempo_days(self) -> TempoDays | None:
         """Summary Tempo days before the end of year."""
-        return await self.auth.async_request(path="rte/tempo/days")
+        raw = await self.auth.async_request(path="rte/tempo/days")
+        try:
+            return TempoDays.model_validate(raw)
+        except ValidationError as error:
+            _LOGGER.debug("Unexpected tempo days payload: %s (%s)", raw, error)
+            return None
 
-    async def async_get_tempo_prices(self) -> Any:
-        """Return Tempo prices."""
-        return await self.auth.async_request(path="rte/tempo/price")
+    async def async_get_tempo_prices(self) -> Prices | None:
+        """Return Tempo prices as a :class:`Prices` model, one value per colour."""
+        raw = await self.auth.async_request(path="rte/tempo/price")
+        try:
+            return Prices(
+                standard=TempoPrice(
+                    blue=raw.get("blue_hp", 0),
+                    white=raw.get("white_hp", 0),
+                    red=raw.get("red_hp", 0),
+                ),
+                offpeak=TempoPrice(
+                    blue=raw.get("blue_hc", 0),
+                    white=raw.get("white_hc", 0),
+                    red=raw.get("red_hc", 0),
+                ),
+            )
+        except (AttributeError, ValidationError) as error:
+            _LOGGER.debug("Unexpected tempo prices payload: %s (%s)", raw, error)
+            return None
 
     async def async_get_ecowatt(
         self, start: dt | None = None, end: dt | None = None
-    ) -> Any:
+    ) -> EcowattMapping:
         """Return Ecowatt information."""
         str_start = (
             start.strftime("%Y-%m-%d") if start else local_now().strftime("%Y-%m-%d")
@@ -116,7 +166,12 @@ class Enedis:
             if end
             else (local_now() + timedelta(days=1)).strftime("%Y-%m-%d")
         )
-        return await self.async_request(path=f"rte/ecowatt/{str_start}/{str_end}")
+        raw = await self.async_request(path=f"rte/ecowatt/{str_start}/{str_end}")
+        try:
+            return EcowattResponse.validate_python(raw)
+        except ValidationError as error:
+            _LOGGER.debug("Unexpected ecowatt payload: %s (%s)", raw, error)
+            return {}
 
     async def async_has_offpeak(self, pdl: str) -> bool:
         """Has offpeak hours."""
@@ -146,17 +201,27 @@ class Enedis:
                     return True
         return False
 
-    async def async_get_identity(self, pdl: str) -> Any:
+    async def async_get_identity(self, pdl: str) -> IdentityResponse:
         """Get identity."""
-        return await self.async_fetch_datas("identity", pdl)
+        return IdentityResponse.model_validate(
+            await self.async_fetch_datas("identity", pdl)
+        )
 
-    async def async_get_daily_consumption(self, pdl: str, start: dt, end: dt) -> Any:
+    async def async_get_daily_consumption(
+        self, pdl: str, start: dt, end: dt
+    ) -> DataCollect:
         """Get daily consumption."""
-        return await self.async_fetch_datas(DAILY_CONSUM, pdl, start, end)
+        return DataCollect.model_validate(
+            await self.async_fetch_datas(DAILY_CONSUM, pdl, start, end)
+        )
 
-    async def async_get_daily_production(self, pdl: str, start: dt, end: dt) -> Any:
+    async def async_get_daily_production(
+        self, pdl: str, start: dt, end: dt
+    ) -> DataCollect:
         """Get daily production."""
-        return await self.async_fetch_datas(DAILY_PROD, pdl, start, end)
+        return DataCollect.model_validate(
+            await self.async_fetch_datas(DAILY_PROD, pdl, start, end)
+        )
 
     async def async_get_details_consumption(
         self, pdl: str, start: dt, end: dt
@@ -170,10 +235,10 @@ class Enedis:
         """Get production details. (max: 7 days)."""
         return await self._async_get_details(DETAIL_PROD, pdl, start, end)
 
-    async def async_get_max_power(self, pdl: str, start: dt, end: dt) -> Any:
+    async def async_get_max_power(self, pdl: str, start: dt, end: dt) -> DataCollect:
         """Get consumption max power."""
-        return await self.async_fetch_datas(
-            "daily_consumption_max_power", pdl, start, end
+        return DataCollect.model_validate(
+            await self.async_fetch_datas("daily_consumption_max_power", pdl, start, end)
         )
 
     async def _async_get_details(
@@ -182,31 +247,30 @@ class Enedis:
         """Fetch details (max: 7 days)."""
 
         data: DataCollect | None = None
-        response: DataCollect | None = None
         raise_error = False
 
         for interval in list(self.date_range(start, end, 7)):
             start, end = interval
+            response: DataCollect | None = None
             try:
                 if raise_error is False:
-                    response = await self.async_fetch_datas(service, pdl, start, end)
+                    response = DataCollect.model_validate(
+                        await self.async_fetch_datas(service, pdl, start, end)
+                    )
             except EnedisException as error:
                 raise_error = True
-                response = None
                 _LOGGER.error(error)
 
             if response is None:
                 continue
 
-            new_data: list[IntervalReading] | None = response.get(
-                "meter_reading", {}
-            ).get("interval_reading")
-            if new_data is None:
+            new_data = response.meter_reading.interval_reading
+            if not new_data:
                 continue
             elif data is None:
                 data = response
             else:
-                data["meter_reading"]["interval_reading"].extend(new_data)
+                data.meter_reading.interval_reading.extend(new_data)
 
         return data
 

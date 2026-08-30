@@ -1,11 +1,12 @@
 """Class for my PDL."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from datetime import date, datetime as dt, timedelta, tzinfo as _tzinfo
 import logging
 from typing import Any, Literal
 
 from aiohttp import ClientSession
+from pydantic import BaseModel, ValidationError
 
 from .analytics import EnedisAnalytics
 from .api import Enedis
@@ -17,7 +18,6 @@ from .const import (
     ATTR_FN,
     ATTR_HPHC,
     ATTR_INTERVALS,
-    ATTR_OFFPEAK,
     ATTR_PRICE,
     ATTR_PRICES,
     ATTR_PROD,
@@ -31,76 +31,32 @@ from .const import (
     DETAIL_CONSUM,
     DETAIL_PROD,
     SUBSCRIPTIONS,
-    TEMPO_B,
-    TEMPO_DAYS,
 )
 from .exceptions import EnedisException, LimitReached
 from .types import (
+    AccessResponse,
+    Contract,
     Cum,
     DataCollect,
     EcowattDay,
+    EcowattMapping,
     EnergyCollect,
     Mode,
     Prices,
     Subscription,
+    TempoDays,
     TempoLabels,
-    TempoPrice,
+    TempoMapping,
+    UsagePoint,
 )
 from .tz import as_local, local_now, set_local_timezone
 
 _LOGGER = logging.getLogger(__name__)
 
-STANDARD_KEYS = (ATTR_PRICE,)
 
-
-class FormatError(ValueError):
-    """Raised when a user-provided mapping does not match the expected format."""
-
-
-def _is_number(value: Any) -> bool:
-    """Return True for an int or a float (but not a bool)."""
-    return isinstance(value, (int, float)) and not isinstance(value, bool)
-
-
-def _check_price_group(group: Any, keys: tuple[str, ...], name: str) -> None:
-    """Validate one price group (``standard`` or ``offpeak``)."""
-    if not isinstance(group, dict):
-        raise FormatError(f"'{name}' must be a mapping")
-    if missing := [key for key in keys if key not in group]:
-        raise FormatError(f"'{name}' is missing required keys {missing}")
-    if extra := [key for key in group if key not in keys]:
-        raise FormatError(f"'{name}' has unexpected keys {extra}")
-    if invalid := [key for key in keys if not _is_number(group[key])]:
-        raise FormatError(f"'{name}' values must be numbers {invalid}")
-
-
-def validate_prices(prices: Any) -> None:
-    """Validate a prices mapping and return the detected format."""
-    if not isinstance(prices, dict):
-        raise FormatError("prices must be a mapping")
-    if ATTR_STANDARD not in prices:
-        raise FormatError(f"'{ATTR_STANDARD}' is required")
-    if extra := [key for key in prices if key not in (ATTR_STANDARD, ATTR_OFFPEAK)]:
-        raise FormatError(f"unexpected keys {extra}")
-    standard = prices[ATTR_STANDARD]
-    is_tempo = isinstance(standard, dict) and TEMPO_B in standard
-    keys = TEMPO_DAYS if is_tempo else STANDARD_KEYS
-    _check_price_group(standard, keys, ATTR_STANDARD)
-    if ATTR_OFFPEAK in prices:
-        _check_price_group(prices[ATTR_OFFPEAK], keys, ATTR_OFFPEAK)
-
-
-def validate_cumsum(cum_sum: Any) -> None:
-    """Validate a cumulative summary mapping."""
-    if not isinstance(cum_sum, dict):
-        raise FormatError("cumulative summary must be a mapping")
-    if ATTR_STANDARD not in cum_sum:
-        raise FormatError(f"'{ATTR_STANDARD}' is required")
-    for key, value in cum_sum.items():
-        if key not in (ATTR_STANDARD, ATTR_OFFPEAK):
-            raise FormatError(f"unexpected key '{key}'")
-        if not _is_number(value):
-            raise FormatError(f"'{key}' must be a number")
+def _dump(model: BaseModel | None) -> dict[str, Any]:
+    """Return a plain mapping for a model, dropping unset/``None`` entries."""
+    return model.model_dump(exclude_none=True) if model is not None else {}
 
 
 class EnedisByPDL:
@@ -140,18 +96,18 @@ class EnedisByPDL:
         self._subscription: Subscription = (
             subscription if subscription in SUBSCRIPTIONS else DEFAULT_SUBSCRIPTION
         )
-        self.access: dict[str, Any] | None = None
-        self.address: dict[str, Any] | None = None
-        self.contract: dict[str, Any] | None = None
-        self.ecowatt: dict[str, EcowattDay] | None = None
+        self.access: AccessResponse | None = None
+        self.address: UsagePoint | None = None
+        self.contract: Contract | None = None
+        self.ecowatt: EcowattMapping | None = None
         self.has_collected: bool = False
         self.has_parameters: bool = False
         self.intervals: list[tuple[str, str]] = []
         self.last_access: dt = local_now()
         self.last_refresh: date | None = None
         self.max_power: DataCollect | None = None
-        self.tempo: dict[str, TempoLabels] | None = None
-        self.tempo_days: dict[TempoLabels, int] | None = None
+        self.tempo: TempoMapping | None = None
+        self.tempo_days: TempoDays | None = None
         self.tempo_prices: Prices | None = None
 
         if timezone is not None:
@@ -160,7 +116,7 @@ class EnedisByPDL:
     @property
     def is_connected(self) -> bool:
         """Connect state."""
-        return self.access is not None and (self.access.get("valid", False) is True)
+        return self.access is not None and self.access.valid is True
 
     @property
     def has_intervals(self) -> bool:
@@ -227,7 +183,7 @@ class EnedisByPDL:
         """Statistics."""
         stats: dict[str, Any] = {}
         for mode, params in self._params.items():
-            data = params.get("data", {})
+            data = params.get("data", [])
             analytics = EnedisAnalytics(data, timezone=self._timezone)
             resultat = analytics.get_data_analytics(
                 convertKwh=True,
@@ -235,9 +191,9 @@ class EnedisByPDL:
                 intervals=params.get(ATTR_INTERVALS, []),
                 groupby=True,
                 summary=True,
-                prices=params.get(ATTR_PRICES, {}),
-                cum_value=params.get(ATTR_CUM_VALUE, {}),
-                cum_price=params.get(ATTR_CUM_PRICE, {}),
+                prices=_dump(params.get(ATTR_PRICES)),
+                cum_value=_dump(params.get(ATTR_CUM_VALUE)),
+                cum_price=_dump(params.get(ATTR_CUM_PRICE)),
                 start_date=params.get(ATTR_START),
                 tempo=self.tempo,
             )
@@ -262,8 +218,8 @@ class EnedisByPDL:
 
         try:
             self.access = await self._api.async_valid_access(self.pdl)
-            if self.access is not None and self.access.get("quota_reached", False):
-                detail = self.access.get("information", "Quota reached")
+            if self.access is not None and self.access.quota_reached:
+                detail = self.access.information or "Quota reached"
                 raise LimitReached(409, {"detail": detail})
 
             if self.is_connected is False:
@@ -294,19 +250,7 @@ class EnedisByPDL:
                 self.last_refresh = local_now()
 
             if self.tempo_prices is None and self.has_tempo_subscription:
-                prices_details = await self._api.async_get_tempo_prices()
-                self.tempo_prices = Prices(
-                    standard=TempoPrice(
-                        blue=float(prices_details.get("blue_hp", 0)),
-                        white=float(prices_details.get("white_hp", 0)),
-                        red=float(prices_details.get("red_hp", 0)),
-                    ),
-                    offpeak=TempoPrice(
-                        blue=float(prices_details.get("blue_hc", 0)),
-                        white=float(prices_details.get("white_hc", 0)),
-                        red=float(prices_details.get("red_hc", 0)),
-                    ),
-                )
+                self.tempo_prices = await self._api.async_get_tempo_prices()
 
             if self.tempo_days is None and self.has_tempo_subscription:
                 self.tempo_days = await self._api.async_get_tempo_days()
@@ -330,27 +274,32 @@ class EnedisByPDL:
             self.intervals = intervals
             self._params[mode].update({ATTR_INTERVALS: intervals})
 
-    def _set_prices(self, mode: Mode, prices: Prices) -> None:
+    def _set_prices(self, mode: Mode, prices: Prices | Mapping[str, Any]) -> None:
         """Set prices."""
         try:
-            validate_prices(prices)
-        except FormatError as error:
+            model = (
+                prices if isinstance(prices, Prices) else Prices.model_validate(prices)
+            )
+        except ValidationError as error:
             _LOGGER.error("Format is incorrect (%s)", error)
             return
 
-        self._params[mode].update({ATTR_PRICES: prices})
+        self._params[mode].update({ATTR_PRICES: model})
 
     def _set_cumsum(
-        self, mode: Mode, form: Literal["value", "price"], cum_sum: Cum
+        self,
+        mode: Mode,
+        form: Literal["value", "price"],
+        cum_sum: Cum | Mapping[str, Any],
     ) -> None:
         """Set cumulative summary."""
         try:
-            validate_cumsum(cum_sum)
-        except FormatError as error:
+            model = cum_sum if isinstance(cum_sum, Cum) else Cum.model_validate(cum_sum)
+        except ValidationError as error:
             _LOGGER.error("Format is incorrect (%s)", error)
             return
 
-        self._params[mode].update({f"cum_{form}".lower(): cum_sum})
+        self._params[mode].update({f"cum_{form}".lower(): model})
 
     def set_data_fetch(
         self,
@@ -358,9 +307,9 @@ class EnedisByPDL:
         start: dt | None = None,
         end: dt | None = None,
         intervals: list[tuple[str, str]] | None = None,
-        prices: Prices | None = None,
-        cum_value: Cum | None = None,
-        cum_price: Cum | None = None,
+        prices: Prices | Mapping[str, Any] | None = None,
+        cum_value: Cum | Mapping[str, Any] | None = None,
+        cum_price: Cum | Mapping[str, Any] | None = None,
     ) -> None:
         """Set parameters for data fetching.
 
@@ -406,21 +355,26 @@ class EnedisByPDL:
         """
 
         for mode, attr in self._params.items():
-            dataset = {}
             start = attr[ATTR_START]
             end = attr[ATTR_END]
             fn = attr[ATTR_FN]
 
-            dataset = await fn(self.pdl, start, end)
+            dataset: DataCollect | None = await fn(self.pdl, start, end)
 
             if dataset is None:
                 raise EnedisException("Data collection is empty")
 
-            data = dataset.get("meter_reading", {}).get("interval_reading", [])
-            if len(data) == 0:
+            readings = dataset.meter_reading.interval_reading
+            if len(readings) == 0:
                 raise EnedisException("Data collection is empty")
 
-            self._params[mode].update({"data": data})
+            self._params[mode].update(
+                {
+                    "data": [
+                        reading.model_dump(exclude_none=True) for reading in readings
+                    ]
+                }
+            )
 
             if mode == ATTR_CONSUM and self.has_tempo_subscription:
                 self.tempo = await self._api.async_get_tempo(start, end)
