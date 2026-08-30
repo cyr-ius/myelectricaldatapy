@@ -5,7 +5,6 @@ from __future__ import annotations
 from datetime import datetime as dt
 from unittest.mock import Mock, patch
 
-from aiohttp import ClientSession
 from freezegun import freeze_time
 import pytest
 
@@ -23,55 +22,49 @@ from .consts import PDL, TOKEN
 
 
 @freeze_time("2023-01-23")
-async def test_subscription(mock_enedis: Mock) -> None:
+async def test_subscription(mock_enedis: Mock, session) -> None:
     """Test subscription compute."""
-    api = EnedisByPDL(
-        pdl=PDL, token=TOKEN, session=ClientSession(), subscription="hphc"
-    )
+    api = EnedisByPDL(pdl=PDL, token=TOKEN, session=session, subscription="hphc")
     assert api.has_offpeak_hours_subscription is True
 
 
 @freeze_time("2023-01-23")
-async def test_subscription_error(mock_enedis: Mock) -> None:
+async def test_subscription_error(mock_enedis: Mock, session) -> None:
     """Test subscription msiconfiguration value."""
-    api = EnedisByPDL(
-        pdl=PDL, token=TOKEN, session=ClientSession(), subscription="toto"
-    )
+    api = EnedisByPDL(pdl=PDL, token=TOKEN, session=session, subscription="toto")
     assert api.has_standard_subscription is True
 
 
 @freeze_time("2023-01-23")
-async def test_ecowatt(mock_enedis: Mock) -> None:
+async def test_ecowatt(mock_enedis: Mock, session) -> None:
     """Test get ecowatt."""
-    api = Enedis(token=TOKEN, session=ClientSession())
+    api = Enedis(token=TOKEN, session=session)
     resultat = await api.async_get_ecowatt()
     assert resultat["2023-01-22"].value == 1
 
-    mypdl = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
+    mypdl = EnedisByPDL(pdl=PDL, token=TOKEN, session=session)
     mypdl.set_ecowatt_subscription(True)
     await mypdl.async_update()
     assert mypdl.ecowatt_day.message == "Pas d’alerte."
 
 
 @pytest.mark.parametrize("mock_ecowatt", [True], indirect=True)
-async def test_invalid_ecowatt(mock_enedis: Mock) -> None:
+async def test_invalid_ecowatt(mock_enedis: Mock, session) -> None:
     """Test ecowatt."""
 
-    api = Enedis(token=TOKEN, session=ClientSession())
+    api = Enedis(token=TOKEN, session=session)
     resultat = await api.async_get_ecowatt()
     assert resultat.get("2023-01-22") is None
 
 
 @freeze_time("2023-3-3")
-async def test_tempoday(mock_enedis: Mock) -> None:
+async def test_tempoday(mock_enedis: Mock, session) -> None:
     """Test get tempo day."""
-    api = Enedis(token=TOKEN, session=ClientSession())
+    api = Enedis(token=TOKEN, session=session)
     resultat = await api.async_get_tempo()
     assert resultat["2023-03-01"] == "blue"
 
-    mypdl = EnedisByPDL(
-        pdl=PDL, token=TOKEN, session=ClientSession(), subscription="tempo"
-    )
+    mypdl = EnedisByPDL(pdl=PDL, token=TOKEN, session=session, subscription="tempo")
     mypdl.set_data_fetch(DETAIL_CONSUM)
     await mypdl.async_update()
     resultat = mypdl.stats["consumption"]
@@ -79,11 +72,9 @@ async def test_tempoday(mock_enedis: Mock) -> None:
 
 
 @freeze_time("2023-3-3")
-async def test_tempo_infos(mock_enedis: Mock) -> None:
+async def test_tempo_infos(mock_enedis: Mock, session) -> None:
     """Test get tempo day."""
-    api = EnedisByPDL(
-        pdl=PDL, token=TOKEN, session=ClientSession(), subscription="tempo"
-    )
+    api = EnedisByPDL(pdl=PDL, token=TOKEN, session=session, subscription="tempo")
     await api.async_update()
     assert api.tempo_days.red == 5
     assert api.tempo_prices.standard.blue == 0.1654
@@ -91,7 +82,7 @@ async def test_tempo_infos(mock_enedis: Mock) -> None:
 
 
 @freeze_time("2023-03-01")
-async def test_check_offpeak(mock_enedis) -> None:
+async def test_check_offpeak(mock_enedis, session) -> None:
     """Test off-peak hour detection against the real contract's schedule.
 
     contract.json's offpeak_hours is "HC (1H30-8H00;12H30-14H00)". Patches
@@ -99,7 +90,7 @@ async def test_check_offpeak(mock_enedis) -> None:
     Enedis.async_get_contract runs and populates self.offpeaks.
     """
 
-    api = Enedis(token=TOKEN, session=ClientSession())
+    api = Enedis(token=TOKEN, session=session)
     assert await api.async_has_offpeak(PDL) is True
 
     # 03:00 falls inside the 01:30-08:00 off-peak window
@@ -129,9 +120,9 @@ async def test_check_offpeak(mock_enedis) -> None:
     )
 
 
-async def test_valid_access(mock_enedis: Mock) -> None:  # pylint: disable=unused-argument
+async def test_valid_access(mock_enedis: Mock, session) -> None:  # pylint: disable=unused-argument
     """Test access."""
-    api = Enedis(token=TOKEN, session=ClientSession())
+    api = Enedis(token=TOKEN, session=session)
     resultat = await api.async_valid_access(PDL)
     assert resultat.valid is True
 
@@ -140,20 +131,20 @@ async def test_valid_access(mock_enedis: Mock) -> None:  # pylint: disable=unuse
 
 
 @pytest.mark.parametrize("mock_access", [True], indirect=True)
-async def test_invalid_access(mock_enedis: Mock) -> None:
+async def test_invalid_access(mock_enedis: Mock, session) -> None:
     """Test access."""
 
-    api = Enedis(token=TOKEN, session=ClientSession())
+    api = Enedis(token=TOKEN, session=session)
     resultat = await api.async_valid_access(PDL)
     assert resultat.quota_reached is True
 
 
-async def test_fetch_data(mock_enedis) -> None:
+async def test_fetch_data(mock_enedis, session) -> None:
     """Test fetch data."""
     with patch.object(
         myelectricaldatapy.auth.EnedisAuth, "async_request", return_value=mock_enedis
     ):
-        api = Enedis(token=TOKEN, session=ClientSession())
+        api = Enedis(token=TOKEN, session=session)
         resultat = await api.async_fetch_datas(
             service=DETAIL_CONSUM,
             pdl=PDL,
@@ -168,10 +159,11 @@ async def test_fetch_data(mock_enedis) -> None:
 
 async def test_force_refresh(
     mock_enedis: Mock,  # pylint: disable=unused-argument
+    session,
 ) -> None:
     """Test refresh object."""
 
-    api = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
+    api = EnedisByPDL(pdl=PDL, token=TOKEN, session=session)
     api.set_data_fetch(DETAIL_CONSUM)
     await api.async_update()
     save_refresh = api.last_refresh
@@ -183,6 +175,7 @@ async def test_force_refresh(
 
 async def test_exception(
     mock_enedis: Mock,  # pylint: disable=unused-argument
+    session,
 ) -> None:
     """Tests raise exception."""
     with patch.object(
@@ -190,7 +183,7 @@ async def test_exception(
         "async_valid_access",
         side_effect=LimitReached(500, {"detail": "Limit reached"}),
     ):
-        api = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
+        api = EnedisByPDL(pdl=PDL, token=TOKEN, session=session)
         api.set_data_fetch(DETAIL_CONSUM)
         try:
             await api.async_update()
@@ -204,7 +197,7 @@ async def test_exception(
         "async_get_details_consumption",
         side_effect=LimitReached(500, {"detail": "Limit reached"}),
     ):
-        api = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
+        api = EnedisByPDL(pdl=PDL, token=TOKEN, session=session)
         api.set_data_fetch(DETAIL_CONSUM)
         try:
             await api.async_update()
@@ -218,7 +211,7 @@ async def test_exception(
         "async_get_details_consumption",
         side_effect=EnedisException(500, {"detail": "Error"}),
     ):
-        api = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
+        api = EnedisByPDL(pdl=PDL, token=TOKEN, session=session)
         api.set_data_fetch(DETAIL_CONSUM)
         api.set_data_fetch("daily_production")
         try:

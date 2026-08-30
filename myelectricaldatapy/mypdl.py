@@ -1,5 +1,6 @@
 """Class for my PDL."""
 
+import asyncio
 from collections.abc import Callable, Mapping
 from datetime import date, datetime as dt, timedelta, tzinfo as _tzinfo
 import logging
@@ -104,6 +105,7 @@ class EnedisByPDL:
         self.has_parameters: bool = False
         self.intervals: list[tuple[str, str]] = []
         self.last_access: dt = local_now()
+        self._update_lock = asyncio.Lock()
         self.last_refresh: date | None = None
         self.max_power: DataCollect | None = None
         self.tempo: TempoMapping | None = None
@@ -192,21 +194,38 @@ class EnedisByPDL:
             stats.update({mode: resultat})
         return stats
 
+    def _cache_is_stale(self) -> bool:
+        """Return True when the cached data belongs to a past calendar day.
+
+        The Enedis daily call quota resets at local midnight, so a day change
+        is the right trigger to drop the cache and refetch.
+        """
+        return self.last_access.date() != local_now().date()
+
+    def _reset_daily_cache(self) -> None:
+        """Drop every per-day cached attribute so the next update refetches it."""
+        self.access = None
+        self.contract = None
+        self.address = None
+        self.ecowatt = None
+        self.max_power = None
+        self.has_collected = False
+        self.tempo_days = None
+        self.tempo_prices = None
+
     async def async_update(self, force_refresh: bool = False) -> None:
         """Update data."""
+        async with self._update_lock:
+            await self._async_update(force_refresh)
+
+    async def _async_update(self, force_refresh: bool = False) -> None:
+        """Update data (serialized by async_update's lock)."""
 
         start = local_now() - timedelta(days=1095)
         end = local_now() + timedelta(days=1)
 
-        if force_refresh or (self.last_access.date() != local_now().date()):
-            self.access = None
-            self.contract = None
-            self.address = None
-            self.ecowatt = None
-            self.max_power = None
-            self.has_collected = False
-            self.tempo_days = None
-            self.tempo_prices = None
+        if force_refresh or self._cache_is_stale():
+            self._reset_daily_cache()
 
         try:
             self.access = await self._api.async_valid_access(self.pdl)

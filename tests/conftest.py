@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Generator
+from collections.abc import AsyncGenerator, Generator
 import json
 from unittest.mock import AsyncMock, patch
 
+from aiohttp import ClientSession
 import pytest
 
 from myelectricaldatapy.types import (
@@ -20,6 +21,13 @@ from myelectricaldatapy.types import (
     UsagePoint,
 )
 from tests import load_fixture
+
+
+@pytest.fixture(name="session")
+async def session() -> AsyncGenerator[ClientSession, None]:
+    """Provide an aiohttp session that is closed on teardown."""
+    async with ClientSession() as client:
+        yield client
 
 
 @pytest.fixture(name="mock_access")
