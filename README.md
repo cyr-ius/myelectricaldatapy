@@ -1,6 +1,6 @@
 # myelectricaldatapy
 
-Fetch date Enedis Linky from myelectricaldata.fr (enedisgateway.tech)
+Fetch Enedis Linky data from myelectricaldata.fr (enedisgateway.tech)
 
 ## Install
 
@@ -14,32 +14,83 @@ Or manually download and install the last version from github
 
 ```bash
 $ git clone https://github.com/cyr-ius/myelectricaldatapy.git
-$ python setup.py install
+$ pip install .
 ```
 
-## Attributes
+## Public API
 
-- tempo_day : RED/WHITE/BLUE
-- ecowatt : Information Dictionary
-- power_Data: Data
+```python
+from myelectricaldatapy import Enedis, EnedisByPDL, EnedisException
+```
 
-## Methods
+- `Enedis` : thin async client, one method per myelectricaldata.fr endpoint.
+- `EnedisByPDL` : higher level helper that aggregates every piece of
+  information for a single delivery point (PDL) and computes analytics.
+- `EnedisException` : base exception. Every library error
+  (`HttpRequestError`, `LimitReached`, `PayloadError`,
+  `TimeoutExceededError`, `AnalyticsError`) derives from it.
 
-- async_get_max_power (start: datetime, end: datetime) Return: max power
-- async_get_details_production (start: datetime, end: datetime) Return: details production (max 7days)
-- async_get_details_consumption (start: datetime, end: datetime) Return: details consumption (max 7days)
-- async_get_daily_production (day: datetime, end: datetime) Return: production (max 1095 days)
-- async_get_daily_consumption (start: datetime, end: datetime) Return: consumption (max 1095 days)
-- async_get_identity Return: Data identity
-- async_check_offpeak (start: datetime) : check if datetime in range offpeak
-- async_has_offpeak Return boolean if offpeak detected
-- async_get_ecowatt Return: ecowatt information
-- async_get_tempoday Return: Tempo day (RED/WHITE/BLUE)
-- async_get_address Return address
-- async_get_contract Return contact
-- async_valid_access Return information access from mylelectricaldata
-- async_load (start: datetime, end: datetime) Return None - Load Data in power_Data attribute
-- async_refresh Return None - Refresh power_Data , tempo_day and ecowatt attributes.
+All payloads are validated and returned as [pydantic](https://docs.pydantic.dev)
+models (`Contract`, `UsagePoint`, `DataCollect`, `TempoDays`, `Prices`, ...).
+
+## `Enedis`
+
+```python
+Enedis(token: str, session: ClientSession | None = None, timeout: int = 30)
+```
+
+| Method                                                       | Description                         |
+| ------------------------------------------------------------ | ----------------------------------- |
+| `async_fetch_datas(service, pdl, start=None, end=None)`      | Raw call to any service             |
+| `async_valid_access(pdl)` / `async_has_access(pdl)`          | Access / quota status               |
+| `async_get_contract(pdl)` / `async_get_contracts(pdl)`       | Contract(s)                         |
+| `async_get_address(pdl)` / `async_get_addresses(pdl)`        | Address(es)                         |
+| `async_get_identity(pdl)`                                    | Identity                            |
+| `async_get_daily_consumption(pdl, start, end)`               | Daily consumption (max 1095 days)   |
+| `async_get_daily_production(pdl, start, end)`                | Daily production (max 1095 days)    |
+| `async_get_details_consumption(pdl, start, end)`             | Load curve consumption (max 7 days) |
+| `async_get_details_production(pdl, start, end)`              | Load curve production (max 7 days)  |
+| `async_get_max_power(pdl, start, end)`                       | Max power                           |
+| `async_get_ecowatt(start=None, end=None)`                    | Ecowatt forecast                    |
+| `async_get_tempo(start=None, end=None)`                      | Tempo day colors on a range         |
+| `async_get_tempo_days()`                                     | Tempo calendar                      |
+| `async_get_tempo_prices()`                                   | Tempo prices                        |
+| `async_has_offpeak(pdl)` / `async_check_offpeak(pdl, start)` | Off-peak helpers                    |
+| `async_close()`                                              | Close the aiohttp session           |
+
+## `EnedisByPDL`
+
+```python
+EnedisByPDL(
+    pdl: str,
+    token: str,
+    subscription: str = "standard",   # "standard" | "hphc" | "tempo"
+    session: ClientSession | None = None,
+    timeout: int = 30,
+    timezone: tzinfo | None = None,
+)
+```
+
+Workflow:
+
+1. Optionally declare what you want to collect with
+   `set_data_fetch(...)`, `set_ecowatt_subscription(True)` and
+   `set_maxpower_subscription(True)`.
+2. Call `await async_update()` (or `async_update(force_refresh=True)`).
+3. Read the aggregated results.
+
+| Member                                                                                                                                                                            | Description                                                                                           |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `set_data_fetch(service, start=None, end=None, intervals=None, prices=None, cum_value=None, cum_price=None)`                                                                      | Register a collect (`service` is one of `DAILY_CONSUM`, `DAILY_PROD`, `DETAIL_CONSUM`, `DETAIL_PROD`) |
+| `set_ecowatt_subscription(activate=False)`                                                                                                                                        | Enable Ecowatt retrieval                                                                              |
+| `set_maxpower_subscription(activate=False)`                                                                                                                                       | Enable max power retrieval                                                                            |
+| `async_update(force_refresh=False)`                                                                                                                                               | Refresh access, contract, address, tempo, ecowatt, collects                                           |
+| `async_update_collects()`                                                                                                                                                         | Refresh only the registered collects                                                                  |
+| `stats`                                                                                                                                                                           | `dict` keyed by mode (`"consumption"` / `"production"`) with the computed analytics                   |
+| `access`, `contract`, `address`, `ecowatt`, `max_power`, `tempo`, `tempo_days`, `tempo_prices`                                                                                    | Last fetched models                                                                                   |
+| `is_connected`, `has_intervals`, `has_tempo_subscription`, `has_offpeak_hours_subscription`, `has_standard_subscription`, `has_ecowatt_subscription`, `has_maxpower_subscription` | Boolean state                                                                                         |
+| `ecowatt_day`, `tempo_day`, `consum_prices`, `prod_prices`                                                                                                                        | Convenience accessors for today                                                                       |
+| `async_close()`                                                                                                                                                                   | Close the aiohttp session                                                                             |
 
 ## Timezone
 
@@ -54,7 +105,7 @@ application is actually configured for (e.g. Home Assistant's
 the reported times:
 
 ```python
-api = EnedisByPDL(token=TOKEN, pdl=PDL, timezone=ZoneInfo("Europe/Paris"))
+api = EnedisByPDL(pdl=PDL, token=TOKEN, timezone=ZoneInfo("Europe/Paris"))
 ```
 
 Alternatively, set it once globally for every instance:
@@ -68,53 +119,41 @@ set_local_timezone(ZoneInfo("Europe/Paris"))
 ## Get started
 
 ```python
-# Import the myelectricaldatapy package.
-from myelectricaldatapy import EnedisByPDL,EnedisAnalytics
+import asyncio
+from datetime import timedelta
 
-TOKEN="012345"
-PDL="012345012345"
+from myelectricaldatapy import DETAIL_CONSUM, EnedisByPDL, EnedisException
+from myelectricaldatapy.tz import local_now
 
-async def main():
-    api = EnedisByPDL(token=TOKEN, pdl=PDL)
-
-    print(await api.async_get_contract())
-    print(await api.async_get_address())
-
-    start = datetime.now() - timedelta(days=7)
-    end = datetime.now()
-    Data = await api.async_get_details_consumption(start,end)
-    print(Data)
-
-    analytics = EnedisAnalytics(Data)
-    offpeak_intervals = [(dt.strptime("08H00", "%HH%M"), dt.strptime("12H00", "%HH%M"))]
-
-    # it is possible to load detailed production and consumption data within the object (in the power_Data attribute)
-    await api.async_load()
-    print(api.power_Data)
-    # and refresh Data load.
-    await api.async_refresh()
-
-    # Analytics data convert
-    resultat = analytics.get_data_analytics(
-        convertKwh=True,
-        convertUTC=True,
-        intervals=offpeak_intervals,
-        groupby="date",
-        summary=True,
-    )
-
-    offpeak = analytics.set_price(resultat[0], 0.1641, True)
-    normal = analytics.set_price(resultat[1], 0.18, True)
-
-    print(offpeak)
-    print(normal)
+TOKEN = "012345"
+PDL = "012345012345"
 
 
+async def main() -> None:
+    api = EnedisByPDL(pdl=PDL, token=TOKEN)
 
-    await api.async_close()
+    try:
+        # Off-peak intervals and per-interval prices are optional.
+        api.set_data_fetch(
+            DETAIL_CONSUM,
+            start=local_now() - timedelta(days=7),
+            end=local_now(),
+            intervals=[("08:00", "12:00")],
+            prices={"standard": {"price": 0.18}, "offpeak": {"price": 0.1641}},
+        )
+        await api.async_update()
 
-loop = asyncio.get_event_loop()
-loop.run_until_complete(main())
+        print(api.contract)
+        print(api.address)
+        print(api.stats["consumption"])
+    except EnedisException as error:
+        print(error)
+    finally:
+        await api.async_close()
+
+
+asyncio.run(main())
 ```
 
-Have a look at the [example.py](https://github.com/cyr-ius/myelectricaldatapy/blob/master/example.py) for a more complete overview.
+Have a look at [example.py](https://github.com/cyr-ius/myelectricaldatapy/blob/master/example.py)
+for a more complete overview.
