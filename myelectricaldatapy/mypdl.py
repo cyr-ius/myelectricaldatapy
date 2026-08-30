@@ -163,20 +163,12 @@ class EnedisByPDL:
     @property
     def prod_prices(self) -> Prices | None:
         """Production resel price."""
-        return (
-            self._params[ATTR_PROD].get(ATTR_PRICES)
-            if self._params is not None
-            else None
-        )
+        return self._params.get(ATTR_PROD, {}).get(ATTR_PRICES)
 
     @property
     def consum_prices(self) -> Prices | None:
         """Consumption prices."""
-        return (
-            self._params[ATTR_CONSUM].get(ATTR_PRICES)
-            if self._params is not None
-            else None
-        )
+        return self._params.get(ATTR_CONSUM, {}).get(ATTR_PRICES)
 
     @property
     def stats(self) -> dict[str, Any]:
