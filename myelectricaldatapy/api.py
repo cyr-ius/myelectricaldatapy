@@ -11,7 +11,7 @@ from aiohttp import ClientSession
 from .auth import EnedisAuth
 from .const import DAILY_CONSUM, DAILY_PROD, DETAIL_CONSUM, DETAIL_PROD
 from .exceptions import EnedisException
-from .types import Service
+from .types import DataCollect, IntervalReading, Service
 from .tz import as_local, get_local_timezone, local_now
 
 _LOGGER = logging.getLogger(__name__)
@@ -158,11 +158,15 @@ class Enedis:
         """Get daily production."""
         return await self.async_fetch_datas(DAILY_PROD, pdl, start, end)
 
-    async def async_get_details_consumption(self, pdl: str, start: dt, end: dt) -> Any:
+    async def async_get_details_consumption(
+        self, pdl: str, start: dt, end: dt
+    ) -> DataCollect | None:
         """Get consumption details. (max: 7 days)."""
         return await self._async_get_details(DETAIL_CONSUM, pdl, start, end)
 
-    async def async_get_details_production(self, pdl: str, start: dt, end: dt) -> Any:
+    async def async_get_details_production(
+        self, pdl: str, start: dt, end: dt
+    ) -> DataCollect | None:
         """Get production details. (max: 7 days)."""
         return await self._async_get_details(DETAIL_PROD, pdl, start, end)
 
@@ -174,11 +178,13 @@ class Enedis:
 
     async def _async_get_details(
         self, service: Service, pdl: str, start: dt, end: dt
-    ) -> Any:
-        """Get production details. (max: 7 days)."""
-        data = None
-        response: dict[str, Any] | None = None
+    ) -> DataCollect | None:
+        """Fetch details (max: 7 days)."""
+
+        data: DataCollect | None = None
+        response: DataCollect | None = None
         raise_error = False
+
         for interval in list(self.date_range(start, end, 7)):
             start, end = interval
             try:
@@ -191,7 +197,10 @@ class Enedis:
 
             if response is None:
                 continue
-            new_data = response.get("meter_reading", {}).get("interval_reading")
+
+            new_data: list[IntervalReading] | None = response.get(
+                "meter_reading", {}
+            ).get("interval_reading")
             if new_data is None:
                 continue
             elif data is None:

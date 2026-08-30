@@ -58,11 +58,6 @@ class Cum(TypedDict):
     offpeak: float
 
 
-class TempoInfos(TypedDict):
-    days: dict[str, int]
-    prices: dict[str, float]
-
-
 class EcowattDay(TypedDict):
     value: int
     message: str
@@ -89,7 +84,7 @@ class MeterReading(TypedDict):
     end: str
     quality: str
     reading_type: ReadingType
-    interval_reading: IntervalReading
+    interval_reading: list[IntervalReading]
 
 
 class DataCollect(TypedDict):
@@ -108,7 +103,6 @@ __all__ = [
     "Service",
     "StandardPrice",
     "Subscription",
-    "TempoInfos",
     "TempoLabels",
     "TempoPrice",
 ]

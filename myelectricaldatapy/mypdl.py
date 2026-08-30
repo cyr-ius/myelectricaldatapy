@@ -43,8 +43,8 @@ from .types import (
     Mode,
     Prices,
     Subscription,
-    TempoInfos,
     TempoLabels,
+    TempoPrice,
 )
 from .tz import as_local, local_now, set_local_timezone
 
@@ -151,7 +151,8 @@ class EnedisByPDL:
         self.last_refresh: date | None = None
         self.max_power: DataCollect | None = None
         self.tempo: dict[str, TempoLabels] | None = None
-        self.tempo_infos: TempoInfos | None = None
+        self.tempo_days: dict[TempoLabels, int] | None = None
+        self.tempo_prices: Prices | None = None
 
         if timezone is not None:
             set_local_timezone(timezone)
@@ -256,7 +257,8 @@ class EnedisByPDL:
             self.ecowatt = None
             self.max_power = None
             self.has_collected = False
-            self.tempo_infos = None
+            self.tempo_days = None
+            self.tempo_prices = None
 
         try:
             self.access = await self._api.async_valid_access(self.pdl)
@@ -291,11 +293,23 @@ class EnedisByPDL:
                 await self.async_update_collects()
                 self.last_refresh = local_now()
 
-            if self.tempo_infos is None and self.has_tempo_subscription:
-                self.tempo_infos = {
-                    "days": await self._api.async_get_tempo_days(),
-                    "prices": await self._api.async_get_tempo_prices(),
-                }
+            if self.tempo_prices is None and self.has_tempo_subscription:
+                prices_details = await self._api.async_get_tempo_prices()
+                self.tempo_prices = Prices(
+                    standard=TempoPrice(
+                        blue=float(prices_details.get("blue_hp", 0)),
+                        white=float(prices_details.get("white_hp", 0)),
+                        red=float(prices_details.get("red_hp", 0)),
+                    ),
+                    offpeak=TempoPrice(
+                        blue=float(prices_details.get("blue_hc", 0)),
+                        white=float(prices_details.get("white_hc", 0)),
+                        red=float(prices_details.get("red_hc", 0)),
+                    ),
+                )
+
+            if self.tempo_days is None and self.has_tempo_subscription:
+                self.tempo_days = await self._api.async_get_tempo_days()
 
         except EnedisException as error:
             raise error from error

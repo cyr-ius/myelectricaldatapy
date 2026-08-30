@@ -78,6 +78,18 @@ async def test_tempoday(mock_enedis: Mock) -> None:
     assert mypdl.tempo_day == "blue"
 
 
+@freeze_time("2023-3-3")
+async def test_tempo_infos(mock_enedis: Mock) -> None:
+    """Test get tempo day."""
+    api = EnedisByPDL(
+        pdl=PDL, token=TOKEN, session=ClientSession(), subscription="tempo"
+    )
+    await api.async_update()
+    assert api.tempo_days["red"] == 5
+    assert api.tempo_prices["standard"]["blue"] == 0.1654
+    assert api.tempo_prices["offpeak"]["blue"] == 0.1356
+
+
 @freeze_time("2023-03-01")
 async def test_check_offpeak(mock_enedis) -> None:
     """Test off-peak hour detection against the real contract's schedule.
