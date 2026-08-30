@@ -55,7 +55,7 @@ class Enedis:
     async def async_get_contract(self, pdl: str) -> Any:
         """Return contract information."""
         contract = {}
-        contracts = await self.async_fetch_datas("contracts", pdl)
+        contracts = await self.async_get_contracts(pdl)
         usage_points = contracts.get("customer", {}).get("usage_points", "")
         for usage_point in usage_points:
             if usage_point.get("usage_point", {}).get("usage_point_id") == pdl:
@@ -95,6 +95,14 @@ class Enedis:
             else (local_now() + timedelta(days=1)).strftime("%Y-%m-%d")
         )
         return await self.auth.async_request(path=f"rte/tempo/{str_start}/{str_end}")
+
+    async def async_get_tempo_days(self) -> Any:
+        """Summary Tempo days before the end of year."""
+        return await self.auth.async_request(path="rte/tempo/days")
+
+    async def async_get_tempo_prices(self) -> Any:
+        """Return Tempo prices."""
+        return await self.auth.async_request(path="rte/tempo/price")
 
     async def async_get_ecowatt(
         self, start: dt | None = None, end: dt | None = None
