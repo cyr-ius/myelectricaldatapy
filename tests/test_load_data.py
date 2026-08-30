@@ -36,6 +36,22 @@ async def test_subscription_error(mock_enedis: Mock, session) -> None:
 
 
 @freeze_time("2023-01-23")
+async def test_address(mock_enedis: Mock, session) -> None:
+    """Test subscription compute."""
+    api = EnedisByPDL(pdl=PDL, token=TOKEN, session=session)
+    await api.async_update()
+    assert api.address.usage_point_id == "01234567890"
+
+
+@freeze_time("2023-01-23")
+async def test_contract(mock_enedis: Mock, session) -> None:
+    """Test subscription compute."""
+    api = EnedisByPDL(pdl=PDL, token=TOKEN, session=session)
+    await api.async_update()
+    assert api.contract.segment == "C5"
+
+
+@freeze_time("2023-01-23")
 async def test_ecowatt(mock_enedis: Mock, session) -> None:
     """Test get ecowatt."""
     api = Enedis(token=TOKEN, session=session)
