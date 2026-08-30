@@ -141,7 +141,7 @@ class Enedis:
 
     async def async_get_tempo_days(self) -> TempoDays | None:
         """Summary Tempo days before the end of year."""
-        raw = await self.auth.async_request(path="rte/tempo/days")
+        raw = await self.auth.async_request(path="edf/tempo/days")
         try:
             return TempoDays.model_validate(raw)
         except ValidationError as error:
@@ -150,7 +150,7 @@ class Enedis:
 
     async def async_get_tempo_prices(self) -> Prices | None:
         """Return Tempo prices as a :class:`Prices` model, one value per colour."""
-        raw = await self.auth.async_request(path="rte/tempo/price")
+        raw = await self.auth.async_request(path="edf/tempo/price")
         try:
             return Prices(
                 standard=TempoPrice(
