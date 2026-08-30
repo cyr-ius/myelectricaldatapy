@@ -45,12 +45,12 @@ async def test_ecowatt(mock_enedis: Mock) -> None:
     """Test get ecowatt."""
     api = Enedis(token=TOKEN, session=ClientSession())
     resultat = await api.async_get_ecowatt()
-    assert resultat["2023-01-22"]["value"] == 1
+    assert resultat["2023-01-22"].value == 1
 
     mypdl = EnedisByPDL(pdl=PDL, token=TOKEN, session=ClientSession())
     mypdl.set_ecowatt_subscription(True)
     await mypdl.async_update()
-    assert mypdl.ecowatt_day["message"] == "Pas d’alerte."
+    assert mypdl.ecowatt_day.message == "Pas d’alerte."
 
 
 @pytest.mark.parametrize("mock_ecowatt", [True], indirect=True)
@@ -85,9 +85,9 @@ async def test_tempo_infos(mock_enedis: Mock) -> None:
         pdl=PDL, token=TOKEN, session=ClientSession(), subscription="tempo"
     )
     await api.async_update()
-    assert api.tempo_days["red"] == 5
-    assert api.tempo_prices["standard"]["blue"] == 0.1654
-    assert api.tempo_prices["offpeak"]["blue"] == 0.1356
+    assert api.tempo_days.red == 5
+    assert api.tempo_prices.standard.blue == 0.1654
+    assert api.tempo_prices.offpeak.blue == 0.1356
 
 
 @freeze_time("2023-03-01")
@@ -133,7 +133,7 @@ async def test_valid_access(mock_enedis: Mock) -> None:  # pylint: disable=unuse
     """Test access."""
     api = Enedis(token=TOKEN, session=ClientSession())
     resultat = await api.async_valid_access(PDL)
-    assert resultat["valid"] is True
+    assert resultat.valid is True
 
     resultat = await api.async_has_access(PDL)
     assert resultat is True
@@ -145,7 +145,7 @@ async def test_invalid_access(mock_enedis: Mock) -> None:
 
     api = Enedis(token=TOKEN, session=ClientSession())
     resultat = await api.async_valid_access(PDL)
-    assert resultat["quota_reached"] is True
+    assert resultat.quota_reached is True
 
 
 async def test_fetch_data(mock_enedis) -> None:
@@ -211,7 +211,7 @@ async def test_exception(
         except LimitReached:
             pass
         assert api.last_access is not None
-        assert api.access["valid"] is True
+        assert api.access.valid is True
 
     with patch.object(
         myelectricaldatapy.Enedis,
@@ -227,4 +227,4 @@ async def test_exception(
         except EnedisException:
             pass
         assert api.last_access is not None
-        assert api.access["valid"] is True
+        assert api.access.valid is True

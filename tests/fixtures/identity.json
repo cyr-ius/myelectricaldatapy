@@ -1,0 +1,10 @@
+{
+  "customer_id": "-1234567890",
+  "identity": {
+    "natural_person": {
+      "title": "M",
+      "firstname": "M.",
+      "lastname": "DOE JOHN"
+    }
+  }
+}
