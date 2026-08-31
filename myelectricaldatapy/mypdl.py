@@ -103,7 +103,7 @@ class EnedisByPDL:
         self.ecowatt: EcowattMapping | None = None
         self.has_collected: bool = False
         self.has_parameters: bool = False
-        self.intervals: list[tuple[str, str]] = []
+        self.offpeak_intervals: list[tuple[str, str]] = []
         self.last_access: dt = local_now()
         self._update_lock = asyncio.Lock()
         self.last_refresh: date | None = None
@@ -123,7 +123,7 @@ class EnedisByPDL:
     @property
     def has_intervals(self) -> bool:
         """Intervals exist."""
-        return len(self.intervals) > 0
+        return len(self.offpeak_intervals) > 0
 
     @property
     def has_tempo_subscription(self) -> bool:
@@ -239,6 +239,7 @@ class EnedisByPDL:
             if self.contract is None and self.has_collected is False:
                 try:
                     self.contract = await self._api.async_get_contract(self.pdl)
+                    self.offpeak_intervals = self._api.offpeaks
                 except EnedisException as error:
                     _LOGGER.warning(error)
 
@@ -282,7 +283,7 @@ class EnedisByPDL:
     def _set_intervals(self, mode: Mode, intervals: list[tuple[str, str]]) -> None:
         """Set intervals."""
         if isinstance(intervals, list):
-            self.intervals = intervals
+            self.offpeak_intervals = intervals
             self._params[mode].update({ATTR_INTERVALS: intervals})
 
     def _set_prices(self, mode: Mode, prices: Prices | Mapping[str, Any]) -> None:
