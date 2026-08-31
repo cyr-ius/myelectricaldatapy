@@ -52,6 +52,18 @@ async def test_contract(mock_enedis: Mock, session) -> None:
 
 
 @freeze_time("2023-01-23")
+async def test_offpeak_intervals(mock_enedis: Mock, session) -> None:
+    """Test subscription compute."""
+    api = Enedis(token=TOKEN, session=session)
+    await api.async_get_contract(PDL)
+    assert isinstance(api.offpeaks[0], tuple)
+
+    api = EnedisByPDL(pdl=PDL, token=TOKEN, session=session)
+    await api.async_update()
+    assert isinstance(api.offpeak_intervals[0], tuple)
+
+
+@freeze_time("2023-01-23")
 async def test_ecowatt(mock_enedis: Mock, session) -> None:
     """Test get ecowatt."""
     api = Enedis(token=TOKEN, session=session)
