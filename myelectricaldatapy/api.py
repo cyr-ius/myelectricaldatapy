@@ -58,7 +58,7 @@ class Enedis:
         session = session or ClientSession()
         self.auth = EnedisAuth(session, token, timeout)
         self.async_request = self.auth.async_request
-        self.offpeaks: list[str] = []
+        self.offpeaks: list[tuple[str, str]] = []
         self.last_access: date | None = None
 
     async def async_fetch_datas(
@@ -72,7 +72,7 @@ class Enedis:
             start_date = start.strftime("%Y-%m-%d")
             end_date = end.strftime("%Y-%m-%d")
             path_range = f"/start/{start_date}/end/{end_date}"
-        path = f"{service}/{pdl}{path_range}"
+        path = f"/{service}/{pdl}{path_range}"
         return await self.async_request(path=path)
 
     async def async_valid_access(self, pdl: str) -> AccessResponse:
@@ -132,7 +132,7 @@ class Enedis:
             if end
             else (local_now() + timedelta(days=1)).strftime("%Y-%m-%d")
         )
-        raw = await self.auth.async_request(path=f"rte/tempo/{str_start}/{str_end}")
+        raw = await self.auth.async_request(path=f"/rte/tempo/{str_start}/{str_end}")
         try:
             return TempoResponse.validate_python(raw)
         except ValidationError as error:
@@ -141,7 +141,7 @@ class Enedis:
 
     async def async_get_tempo_days(self) -> TempoDays | None:
         """Summary Tempo days before the end of year."""
-        raw = await self.auth.async_request(path="edf/tempo/days")
+        raw = await self.auth.async_request(path="/edf/tempo/days")
         try:
             return TempoDays.model_validate(raw)
         except ValidationError as error:
@@ -150,7 +150,7 @@ class Enedis:
 
     async def async_get_tempo_prices(self) -> Prices | None:
         """Return Tempo prices as a :class:`Prices` model, one value per colour."""
-        raw = await self.auth.async_request(path="edf/tempo/price")
+        raw = await self.auth.async_request(path="/edf/tempo/price")
         try:
             return Prices(
                 standard=TempoPrice(
@@ -180,7 +180,7 @@ class Enedis:
             if end
             else (local_now() + timedelta(days=1)).strftime("%Y-%m-%d")
         )
-        raw = await self.async_request(path=f"rte/ecowatt/{str_start}/{str_end}")
+        raw = await self.async_request(path=f"/rte/ecowatt/{str_start}/{str_end}")
         try:
             return EcowattResponse.validate_python(raw)
         except ValidationError as error:

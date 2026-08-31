@@ -41,7 +41,7 @@ class EnedisAuth:
         try:
             async with asyncio.timeout(self.timeout):
                 _LOGGER.debug("Request: %s (%s) - %s", path, method, kwargs.get("json"))
-                response = await self.session.request(method, f"{URL}/{path}", **kwargs)
+                response = await self.session.request(method, f"{URL}{path}", **kwargs)
                 contents = await response.read()
                 response.raise_for_status()
         except (TimeoutError, asyncio.CancelledError) as error:
