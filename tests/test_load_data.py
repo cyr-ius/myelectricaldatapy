@@ -15,6 +15,7 @@ from myelectricaldatapy import (
     EnedisByPDL,
     EnedisException,
     LimitReached,
+    Subscription,
 )
 from myelectricaldatapy.tz import LOCAL_TIMEZONE
 
@@ -24,15 +25,10 @@ from .consts import PDL, TOKEN
 @freeze_time("2023-01-23")
 async def test_subscription(mock_enedis: Mock, session) -> None:
     """Test subscription compute."""
-    api = EnedisByPDL(pdl=PDL, token=TOKEN, session=session, subscription="hphc")
+    api = EnedisByPDL(
+        pdl=PDL, token=TOKEN, session=session, subscription=Subscription.HPHC
+    )
     assert api.has_offpeak_hours_subscription is True
-
-
-@freeze_time("2023-01-23")
-async def test_subscription_error(mock_enedis: Mock, session) -> None:
-    """Test subscription msiconfiguration value."""
-    api = EnedisByPDL(pdl=PDL, token=TOKEN, session=session, subscription="toto")
-    assert api.has_standard_subscription is True
 
 
 @freeze_time("2023-01-23")
@@ -92,7 +88,9 @@ async def test_tempoday(mock_enedis: Mock, session) -> None:
     resultat = await api.async_get_tempo()
     assert resultat["2023-03-01"] == "blue"
 
-    mypdl = EnedisByPDL(pdl=PDL, token=TOKEN, session=session, subscription="tempo")
+    mypdl = EnedisByPDL(
+        pdl=PDL, token=TOKEN, session=session, subscription=Subscription.TEMPO
+    )
     mypdl.set_data_fetch(DETAIL_CONSUM)
     await mypdl.async_update()
     resultat = mypdl.stats["consumption"]
@@ -102,7 +100,9 @@ async def test_tempoday(mock_enedis: Mock, session) -> None:
 @freeze_time("2023-3-3")
 async def test_tempo_infos(mock_enedis: Mock, session) -> None:
     """Test get tempo day."""
-    api = EnedisByPDL(pdl=PDL, token=TOKEN, session=session, subscription="tempo")
+    api = EnedisByPDL(
+        pdl=PDL, token=TOKEN, session=session, subscription=Subscription.TEMPO
+    )
     await api.async_update()
     assert api.tempo_days.red == 5
     assert api.tempo_prices.standard.blue == 0.1654

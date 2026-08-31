@@ -14,6 +14,7 @@ from myelectricaldatapy import (
     DETAIL_CONSUM,
     EnedisByPDL,
     LimitReached,
+    Subscription,
 )
 from myelectricaldatapy.tz import LOCAL_TIMEZONE
 
@@ -235,7 +236,9 @@ async def test_hphc_cumsum_range(mock_enedis: Mock, session) -> None:  # pylint:
 @freeze_time("2023-3-1")
 async def test_tempo_detail_comsumption(mock_enedis: Mock, session) -> None:
     """Test tempo pricings."""
-    api = EnedisByPDL(pdl=PDL, token=TOKEN, session=session, subscription="tempo")
+    api = EnedisByPDL(
+        pdl=PDL, token=TOKEN, session=session, subscription=Subscription.TEMPO
+    )
     api.set_data_fetch(
         DETAIL_CONSUM,
         intervals=OFFPEAK_INTERVALS,
@@ -255,7 +258,9 @@ async def test_tempo_detail_comsumption(mock_enedis: Mock, session) -> None:
 @freeze_time("2023-3-1")
 async def test_tempo_detail_comsumption_with_price(mock_enedis: Mock, session) -> None:
     """Test tempo pricings."""
-    api = EnedisByPDL(pdl=PDL, token=TOKEN, session=session, subscription="tempo")
+    api = EnedisByPDL(
+        pdl=PDL, token=TOKEN, session=session, subscription=Subscription.TEMPO
+    )
     api.set_data_fetch(
         DETAIL_CONSUM,
         prices=TEMPO_PRICE,

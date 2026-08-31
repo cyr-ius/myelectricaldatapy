@@ -17,21 +17,16 @@ from .const import (
     ATTR_CUM_VALUE,
     ATTR_END,
     ATTR_FN,
-    ATTR_HPHC,
     ATTR_INTERVALS,
     ATTR_PRICE,
     ATTR_PRICES,
     ATTR_PROD,
-    ATTR_STANDARD,
     ATTR_START,
-    ATTR_TEMPO,
     CONF_VALUE,
     DAILY_CONSUM,
     DAILY_PROD,
-    DEFAULT_SUBSCRIPTION,
     DETAIL_CONSUM,
     DETAIL_PROD,
-    SUBSCRIPTIONS,
 )
 from .exceptions import EnedisException, LimitReached
 from .types import (
@@ -74,7 +69,7 @@ class EnedisByPDL:
         self,
         pdl: str,
         token: str,
-        subscription: Subscription = "standard",
+        subscription: Subscription = Subscription.STANDARD,
         session: ClientSession | None = None,
         timeout: int = 30,
         timezone: _tzinfo | None = None,
@@ -94,9 +89,7 @@ class EnedisByPDL:
         self._ecowatt_subs: bool = False
         self._maxpower_subs: bool = False
         self._params: dict[Mode, dict[str, Any]] = {}
-        self._subscription: Subscription = (
-            subscription if subscription in SUBSCRIPTIONS else DEFAULT_SUBSCRIPTION
-        )
+        self.subscription: Subscription = subscription
         self.access: AccessResponse | None = None
         self.address: UsagePoint | None = None
         self.contract: Contract | None = None
@@ -128,17 +121,17 @@ class EnedisByPDL:
     @property
     def has_tempo_subscription(self) -> bool:
         """Tempo subscription status."""
-        return self._subscription == ATTR_TEMPO
+        return self.subscription == Subscription.TEMPO
 
     @property
     def has_offpeak_hours_subscription(self) -> bool:
         """Offpeak hours subscription status."""
-        return self._subscription == ATTR_HPHC
+        return self.subscription == Subscription.HPHC
 
     @property
     def has_standard_subscription(self) -> bool:
         """Offpeak hours subscription status."""
-        return self._subscription == ATTR_STANDARD
+        return self.subscription == Subscription.STANDARD
 
     @property
     def has_ecowatt_subscription(self) -> bool:

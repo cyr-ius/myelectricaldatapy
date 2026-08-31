@@ -10,11 +10,12 @@ payloads coming from the API::
 """
 
 from datetime import datetime
+from enum import IntFlag
 from typing import Annotated, Any, Literal
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, TypeAdapter, model_validator
 
-type Subscription = Literal["hphc", "tempo", "standard"]
+# type Subscription = Literal["hphc", "tempo", "standard"]
 type ProductionCollect = Literal["production_load_curve", "daily_production"]
 type ConsumptionCollect = Literal["consumption_load_curve", "daily_consumption"]
 type EnergyCollect = ProductionCollect | ConsumptionCollect
@@ -224,6 +225,14 @@ class TempoDays(_ApiModel):
     blue: int = 0
     white: int = 0
     red: int = 0
+
+
+class Subscription(IntFlag):
+    """Subscription."""
+
+    STANDARD = 1
+    HPHC = 2
+    TEMPO = 4
 
 
 def _check_iso_date(value: str) -> str:
