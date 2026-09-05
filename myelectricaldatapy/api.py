@@ -30,7 +30,7 @@ from .types import (
 )
 from .tz import as_local, get_local_timezone, local_now
 
-_LOGGER = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def _validate[ModelT: BaseModel](model: type[ModelT], raw: Any) -> ModelT:
@@ -136,7 +136,7 @@ class Enedis:
         try:
             return TempoResponse.validate_python(raw)
         except ValidationError as error:
-            _LOGGER.debug("Unexpected tempo payload: %s (%s)", raw, error)
+            logger.debug("Unexpected tempo payload: %s (%s)", raw, error)
             return {}
 
     async def async_get_tempo_days(self) -> TempoDays | None:
@@ -145,7 +145,7 @@ class Enedis:
         try:
             return TempoDays.model_validate(raw)
         except ValidationError as error:
-            _LOGGER.debug("Unexpected tempo days payload: %s (%s)", raw, error)
+            logger.debug("Unexpected tempo days payload: %s (%s)", raw, error)
             return None
 
     async def async_get_tempo_prices(self) -> Prices | None:
@@ -165,7 +165,7 @@ class Enedis:
                 ),
             )
         except (AttributeError, ValidationError) as error:
-            _LOGGER.debug("Unexpected tempo prices payload: %s (%s)", raw, error)
+            logger.debug("Unexpected tempo prices payload: %s (%s)", raw, error)
             return None
 
     async def async_get_ecowatt(
@@ -184,7 +184,7 @@ class Enedis:
         try:
             return EcowattResponse.validate_python(raw)
         except ValidationError as error:
-            _LOGGER.debug("Unexpected ecowatt payload: %s (%s)", raw, error)
+            logger.debug("Unexpected ecowatt payload: %s (%s)", raw, error)
             return {}
 
     async def async_has_offpeak(self, pdl: str) -> bool:
@@ -277,7 +277,7 @@ class Enedis:
                     )
             except EnedisException as error:
                 raise_error = True
-                _LOGGER.error(error)
+                logger.error(error)
 
             if response is None:
                 continue

@@ -47,7 +47,7 @@ from .types import (
 )
 from .tz import as_local, local_now, set_local_timezone
 
-_LOGGER = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def _dump(model: BaseModel | None) -> dict[str, Any]:
@@ -234,13 +234,13 @@ class EnedisByPDL:
                     self.contract = await self._api.async_get_contract(self.pdl)
                     self.offpeak_intervals = self._api.offpeaks
                 except EnedisException as error:
-                    _LOGGER.warning(error)
+                    logger.warning(error)
 
             if self.address is None and self.has_collected is False:
                 try:
                     self.address = await self._api.async_get_address(self.pdl)
                 except EnedisException as error:
-                    _LOGGER.warning(error)
+                    logger.warning(error)
 
             if self.ecowatt is None and self.has_ecowatt_subscription:
                 self.ecowatt = await self._api.async_get_ecowatt(start, end)
@@ -286,7 +286,7 @@ class EnedisByPDL:
                 prices if isinstance(prices, Prices) else Prices.model_validate(prices)
             )
         except ValidationError as error:
-            _LOGGER.error("Format is incorrect (%s)", error)
+            logger.error("Format is incorrect (%s)", error)
             return
 
         self._params[mode].update({ATTR_PRICES: model})
@@ -301,7 +301,7 @@ class EnedisByPDL:
         try:
             model = cum_sum if isinstance(cum_sum, Cum) else Cum.model_validate(cum_sum)
         except ValidationError as error:
-            _LOGGER.error("Format is incorrect (%s)", error)
+            logger.error("Format is incorrect (%s)", error)
             return
 
         self._params[mode].update({f"cum_{form}".lower(): model})

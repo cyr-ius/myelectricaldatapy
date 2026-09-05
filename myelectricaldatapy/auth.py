@@ -17,7 +17,7 @@ from .exceptions import (
     TimeoutExceededError,
 )
 
-_LOGGER = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 URL = "https://myelectricaldata.fr"
 
 
@@ -40,7 +40,7 @@ class EnedisAuth:
 
         try:
             async with asyncio.timeout(self.timeout):
-                _LOGGER.debug("Request: %s (%s) - %s", path, method, kwargs.get("json"))
+                logger.debug("Request: %s (%s) - %s", path, method, kwargs.get("json"))
                 response = await self.session.request(method, f"{URL}{path}", **kwargs)
                 contents = await response.read()
                 response.raise_for_status()
