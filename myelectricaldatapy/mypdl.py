@@ -174,7 +174,6 @@ class EnedisByPDL:
             analytics = EnedisAnalytics(data, timezone=self._timezone)
             resultat = analytics.get_data_analytics(
                 convertKwh=True,
-                convertUTC=False,
                 intervals=params.get(ATTR_INTERVALS, []),
                 groupby=True,
                 summary=True,

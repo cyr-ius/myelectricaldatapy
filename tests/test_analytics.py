@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from datetime import datetime as dt
 from unittest.mock import Mock, patch
 
@@ -16,6 +17,7 @@ from myelectricaldatapy import (
     LimitReached,
     Subscription,
 )
+from myelectricaldatapy.analytics import EnedisAnalytics
 from myelectricaldatapy.tz import LOCAL_TIMEZONE
 
 from .consts import PDL, TOKEN
@@ -331,3 +333,129 @@ async def test_twice_call(
     assert api.stats["production"][0]["notes"] == "standard"
     await api.async_update()
     assert api.last_access is not None
+
+
+# --- EnedisAnalytics internals: interval-start timestamp shift ---------------
+
+
+def test_shift_timestamps_basic() -> None:
+    """A 30min reading is shifted back from interval END to interval START."""
+    analytics = EnedisAnalytics([], timezone=LOCAL_TIMEZONE)
+    readings = [
+        {"date": "2023-03-01 00:30:00", "value": "100", "interval_length": "PT30M"}
+    ]
+
+    shifted = analytics._shift_timestamps_to_interval_start(readings)
+
+    assert shifted[0]["date"] == "2023-03-01 00:00:00"
+
+
+def test_shift_timestamps_midnight_rollover() -> None:
+    """The interval ending at midnight must roll back onto the previous day."""
+    analytics = EnedisAnalytics([], timezone=LOCAL_TIMEZONE)
+    readings = [
+        {"date": "2023-03-02 00:00:00", "value": "100", "interval_length": "PT30M"}
+    ]
+
+    shifted = analytics._shift_timestamps_to_interval_start(readings)
+
+    assert shifted[0]["date"] == "2023-03-01 23:30:00"
+
+
+def test_shift_timestamps_without_interval_length_is_untouched() -> None:
+    """Daily aggregates (no interval_length) are passed through as-is."""
+    analytics = EnedisAnalytics([], timezone=LOCAL_TIMEZONE)
+    readings = [{"date": "2023-03-01", "value": "42000"}]
+
+    shifted = analytics._shift_timestamps_to_interval_start(readings)
+
+    assert shifted == readings
+
+
+def test_shift_timestamps_does_not_mutate_input() -> None:
+    """EnedisByPDL.stats recomputes analytics from the same stored list on
+    every access, so shifting must never mutate the caller's dicts in place.
+    """
+    analytics = EnedisAnalytics([], timezone=LOCAL_TIMEZONE)
+    readings = [
+        {"date": "2023-03-01 00:30:00", "value": "100", "interval_length": "PT30M"}
+    ]
+    original = deepcopy(readings)
+
+    analytics._shift_timestamps_to_interval_start(readings)
+
+    assert readings == original
+
+
+@pytest.mark.parametrize(
+    ("duration", "expected_minutes"),
+    [("PT30M", 30), ("PT1H", 60), ("PT15M", 15), ("not-a-duration", 30)],
+)
+def test_parse_iso8601_duration_to_minutes(
+    duration: str, expected_minutes: int
+) -> None:
+    analytics = EnedisAnalytics([], timezone=LOCAL_TIMEZONE)
+    assert analytics._parse_iso8601_duration_to_minutes(duration) == expected_minutes
+
+
+def test_offpeak_classification_uses_shifted_start_timestamp() -> None:
+    """Regression test for the boundary fix in _get_data_interval.
+
+    Once dates represent the interval START (not END), the offpeak mask
+    must be start-inclusive / end-exclusive; getting this wrong reclassified
+    readings right at the edges of an offpeak window.
+    """
+    data = [
+        # END of 01:00-01:30 -> shifts to 01:00 (before offpeak starts)
+        {"date": "2023-03-01 01:30:00", "value": "1000", "interval_length": "PT30M"},
+        # END of 01:30-02:00 -> shifts to 01:30 (first offpeak interval)
+        {"date": "2023-03-01 02:00:00", "value": "1000", "interval_length": "PT30M"},
+        # END of 07:30-08:00 -> shifts to 07:30 (last offpeak interval)
+        {"date": "2023-03-01 08:00:00", "value": "1000", "interval_length": "PT30M"},
+        # END of 08:00-08:30 -> shifts to 08:00 (offpeak window just ended)
+        {"date": "2023-03-01 08:30:00", "value": "1000", "interval_length": "PT30M"},
+    ]
+    analytics = EnedisAnalytics(data, timezone=LOCAL_TIMEZONE)
+
+    resultat = analytics.get_data_analytics(intervals=[("01:30:00", "08:00:00")])
+
+    notes_by_time = {r["date"].strftime("%H:%M:%S"): r["notes"] for r in resultat}
+    assert notes_by_time["01:00:00"] == "standard"
+    assert notes_by_time["01:30:00"] == "offpeak"
+    assert notes_by_time["07:30:00"] == "offpeak"
+    assert notes_by_time["08:00:00"] == "standard"
+
+
+def test_offpeak_boundaries_snap_to_reading_granularity() -> None:
+    """Documents a known limitation, not a bug: classification cannot be
+    more precise than the data's own step (30min for load curve data).
+
+    A whole reading is either offpeak or standard; it is never split. So an
+    offpeak window declared as 00:54-05:54 is not honoured to the minute:
+    each reading is classified from its own (interval-START) timestamp, so
+    the effective window silently snaps to the surrounding 30min slots
+    (here: 01:00-06:00 instead of 00:54-05:54).
+    """
+    data = [
+        # Represents [00:30, 01:00) - overlaps the declared offpeak window
+        # (00:54-01:00) but is entirely "standard": the reading starts
+        # before 00:54.
+        {"date": "2023-03-01 01:00:00", "value": "1000", "interval_length": "PT30M"},
+        # Represents [01:00, 01:30) - fully inside the declared window.
+        {"date": "2023-03-01 01:30:00", "value": "1000", "interval_length": "PT30M"},
+        # Represents [05:30, 06:00) - overlaps the declared offpeak window
+        # (05:30-05:54) but is entirely "offpeak": the reading starts
+        # before 05:54.
+        {"date": "2023-03-01 06:00:00", "value": "1000", "interval_length": "PT30M"},
+        # Represents [06:00, 06:30) - fully outside the declared window.
+        {"date": "2023-03-01 06:30:00", "value": "1000", "interval_length": "PT30M"},
+    ]
+    analytics = EnedisAnalytics(data, timezone=LOCAL_TIMEZONE)
+
+    resultat = analytics.get_data_analytics(intervals=[("00:54:00", "05:54:00")])
+
+    notes_by_time = {r["date"].strftime("%H:%M:%S"): r["notes"] for r in resultat}
+    assert notes_by_time["00:30:00"] == "standard"
+    assert notes_by_time["01:00:00"] == "offpeak"
+    assert notes_by_time["05:30:00"] == "offpeak"
+    assert notes_by_time["06:00:00"] == "standard"
