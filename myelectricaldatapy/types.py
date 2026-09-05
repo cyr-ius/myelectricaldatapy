@@ -13,14 +13,34 @@ from datetime import datetime
 from enum import IntFlag
 from typing import Annotated, Any, Literal
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, TypeAdapter, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    TypeAdapter,
+    model_validator,
+)
 
 # type Subscription = Literal["hphc", "tempo", "standard"]
 type ProductionCollect = Literal["production_load_curve", "daily_production"]
 type ConsumptionCollect = Literal["consumption_load_curve", "daily_consumption"]
 type EnergyCollect = ProductionCollect | ConsumptionCollect
 type Mode = Literal["consumption", "production"]
-type TempoLabels = Literal["blue", "white", "red"]
+
+
+def _lower_tempo_label(value: Any) -> Any:
+    """Normalize case before matching the ``blue``/``white``/``red`` literals.
+
+    The RTE Tempo API returns the colour in upper case (``"BLUE"``, ...),
+    which does not match the lower-case literal used throughout the package.
+    """
+    return value.lower() if isinstance(value, str) else value
+
+
+type TempoLabels = Annotated[
+    Literal["blue", "white", "red"], BeforeValidator(_lower_tempo_label)
+]
 
 type Service = (
     Literal[
