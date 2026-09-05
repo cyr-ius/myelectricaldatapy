@@ -8,6 +8,7 @@ from .exceptions import (
     HttpRequestError,
     LimitReached,
     PayloadError,
+    ThrottlingError,
     TimeoutExceededError,
 )
 from .mypdl import EnedisByPDL
@@ -68,6 +69,7 @@ __all__ = [
     "TempoDays",
     "TempoLabels",
     "TempoPrice",
+    "ThrottlingError",
     "TimeoutExceededError",
     "UsagePoint",
     "UsagePointAddress",

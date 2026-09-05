@@ -14,6 +14,7 @@ from .exceptions import (
     HttpRequestError,
     LimitReached,
     PayloadError,
+    ThrottlingError,
     TimeoutExceededError,
 )
 
@@ -70,8 +71,20 @@ class EnedisAuth:
             return await response.text()
 
         try:
-            return await response.json()
+            result = await response.json()
         except (ClientError, ValueError) as error:
             raise PayloadError(
                 "Malformed JSON response from MyElectricalData."
             ) from error
+
+        # The gateway signals throttling with an HTTP 200 status and a body
+        # carrying the APIM error code 900804, so it never reaches
+        # ``raise_for_status``. Surface it as a dedicated exception.
+        if isinstance(result, Mapping) and (
+            result.get("code") == "900804"
+            or result.get("message") == "Message throttled out"
+        ):
+            detail = result.get("description") or result.get("message") or result
+            raise ThrottlingError(detail, next_access_time=result.get("nextAccessTime"))
+
+        return result
