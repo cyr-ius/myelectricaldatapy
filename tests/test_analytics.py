@@ -57,7 +57,7 @@ async def test_standard_daily_consumption_with_prices(
     """Test standard with price."""
     api = EnedisByPDL(pdl=PDL, token=TOKEN, session=session)
     api.set_data_fetch(DAILY_CONSUM, prices=STANDARD_PRICE)
-    await api.async_update_collects()
+    await api._async_fetch_data()
     resultat = api.stats["consumption"]
 
     assert resultat[0]["notes"] == "standard"
@@ -69,7 +69,7 @@ async def test_standard_detail_consumption(mock_enedis: Mock, session) -> None:
     """Test standard with price."""
     api = EnedisByPDL(pdl=PDL, token=TOKEN, session=session)
     api.set_data_fetch(DETAIL_CONSUM)
-    await api.async_update_collects()
+    await api._async_fetch_data()
     resultat = api.stats["consumption"]
 
     assert resultat[0]["notes"] == "standard"
@@ -83,7 +83,7 @@ async def test_standard_detail_consumption_with_prices(
     """Test standard with price."""
     api = EnedisByPDL(pdl=PDL, token=TOKEN, session=session)
     api.set_data_fetch(DETAIL_CONSUM, prices=STANDARD_PRICE)
-    await api.async_update_collects()
+    await api._async_fetch_data()
     resultat = api.stats["consumption"]
 
     assert resultat[0]["notes"] == "standard"
@@ -95,7 +95,7 @@ async def test_hphc_detail_consumption(mock_enedis: Mock, session) -> None:
     # Without price
     api = EnedisByPDL(pdl=PDL, token=TOKEN, session=session, subscription="hphc")
     api.set_data_fetch(DETAIL_CONSUM, intervals=OFFPEAK_INTERVALS)
-    await api.async_update_collects()
+    await api._async_fetch_data()
     resultat = api.stats["consumption"]
     assert resultat[27]["value"] == 1.296
     assert resultat[28]["value"] == 0.618
@@ -106,7 +106,7 @@ async def test_hphc_detail_consumption_with_prices(mock_enedis: Mock, session) -
     """Test without offpeak , with price."""
     api = EnedisByPDL(pdl=PDL, token=TOKEN, session=session, subscription="hphc")
     api.set_data_fetch(DETAIL_CONSUM, prices=HPHC_PRICE, intervals=OFFPEAK_INTERVALS)
-    await api.async_update_collects()
+    await api._async_fetch_data()
     resultat = api.stats["consumption"]
 
     assert resultat[0]["notes"] == "offpeak"
@@ -119,7 +119,7 @@ async def test_hphc_detail_consumption_with_prices(mock_enedis: Mock, session) -
 async def test_hphc_daily_consumption(mock_enedis: Mock, session) -> None:
     api = EnedisByPDL(pdl=PDL, token=TOKEN, session=session, subscription="hphc")
     api.set_data_fetch(DAILY_CONSUM, intervals=OFFPEAK_INTERVALS)
-    await api.async_update_collects()
+    await api._async_fetch_data()
     resultat = api.stats["consumption"]
 
     assert resultat[0]["value"] == 42.045
@@ -130,7 +130,7 @@ async def test_hphc_daily_consumption(mock_enedis: Mock, session) -> None:
 async def test_hphc_daily_consumption_with_prices(mock_enedis: Mock, session) -> None:
     api = EnedisByPDL(pdl=PDL, token=TOKEN, session=session, subscription="hphc")
     api.set_data_fetch(DAILY_CONSUM, prices=HPHC_PRICE, intervals=OFFPEAK_INTERVALS)
-    await api.async_update_collects()
+    await api._async_fetch_data()
     resultat = api.stats["consumption"]
 
     assert resultat[0]["value"] == 42.045
@@ -191,7 +191,7 @@ async def test_hphc_cumsums(mock_enedis: Mock, session) -> None:
         cum_value=CUMSUM_VALUE,
         cum_price=CUMSUM_PRICE,
     )
-    await api.async_update_collects()
+    await api._async_fetch_data()
     resultat = api.stats["consumption"]
     # offpeak
     assert resultat[0]["sum_value"] == resultat[0]["value"] + 1000
@@ -212,7 +212,7 @@ async def test_hphc_cumsum_range(mock_enedis: Mock, session) -> None:  # pylint:
         prices=HPHC_PRICE,
         intervals=OFFPEAK_INTERVALS,
     )
-    await api.async_update_collects()
+    await api._async_fetch_data()
     resultat = api.stats["consumption"]
     # offpeak
     assert resultat[0]["sum_value"] is not None
@@ -230,7 +230,7 @@ async def test_hphc_cumsum_range(mock_enedis: Mock, session) -> None:  # pylint:
         "myelectricaldatapy.Enedis.async_fetch_datas",
         side_effect=[mock_enedis, LimitReached(500, {"detail": "Limit reached"})],
     ):
-        await api.async_update_collects()
+        await api._async_fetch_data()
         resultat = api.stats["consumption"]
         assert resultat[0]["sum_value"] is not None
 
@@ -247,14 +247,14 @@ async def test_tempo_detail_comsumption(mock_enedis: Mock, session) -> None:
         cum_value=CUMSUM_VALUE,
         cum_price=CUMSUM_PRICE,
     )
-    await api.async_update_collects()
+    await api.async_update()
     resultat = api.stats["consumption"]
 
     assert resultat[0]["tempo"] == "blue"
     assert resultat[0]["value"] == 1.079
     assert resultat[0].get("sum_price") is None
     assert resultat[0]["sum_value"] == resultat[0]["value"] + 1000
-    assert api.tempo_day == "blue"
+    assert api.tempo == "blue"
 
 
 @freeze_time("2023-3-1")
@@ -270,21 +270,21 @@ async def test_tempo_detail_comsumption_with_price(mock_enedis: Mock, session) -
         cum_value=CUMSUM_VALUE,
         cum_price=CUMSUM_PRICE,
     )
-    await api.async_update_collects()
+    await api.async_update()
     resultat = api.stats["consumption"]
 
     assert resultat[0]["tempo"] == "blue"
     assert resultat[0]["value"] == 1.079
     assert resultat[0]["sum_price"] == resultat[0]["price"] + 75
     assert resultat[0]["sum_value"] == resultat[0]["value"] + 1000
-    assert api.tempo_day == "blue"
+    assert api.tempo == "blue"
 
 
 @freeze_time("2023-3-1")
 async def test_production(mock_enedis: Mock, session) -> None:
     api = EnedisByPDL(pdl=PDL, token=TOKEN, session=session, subscription="tempo")
     api.set_data_fetch(DAILY_PROD, intervals=OFFPEAK_INTERVALS)
-    await api.async_update_collects()
+    await api._async_fetch_data()
     resultat = api.stats.get("production")
     assert resultat[0].get("tempo") is None
     assert resultat[0].get("price") is None
@@ -296,7 +296,7 @@ async def test_production(mock_enedis: Mock, session) -> None:
 async def test_production_with_price(mock_enedis: Mock, session) -> None:
     api = EnedisByPDL(pdl=PDL, token=TOKEN, session=session, subscription="tempo")
     api.set_data_fetch(DAILY_PROD, prices=STANDARD_PRICE, intervals=OFFPEAK_INTERVALS)
-    await api.async_update_collects()
+    await api._async_fetch_data()
     resultat = api.stats.get("production")
     assert round(resultat[1].get("price", 0), 3) == 5.519
     assert resultat[1].get("value") == 32.464
@@ -312,7 +312,7 @@ async def test_start_date(mock_enedis: Mock, session) -> None:
         DETAIL_CONSUM,
         start=dt.strptime("2023-3-7", "%Y-%m-%d").replace(tzinfo=LOCAL_TIMEZONE),
     )
-    await api.async_update_collects()
+    await api._async_fetch_data()
     resultat = api.stats["consumption"]
     assert len(resultat) == 0
 

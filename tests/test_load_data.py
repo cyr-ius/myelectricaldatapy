@@ -94,7 +94,7 @@ async def test_tempoday(mock_enedis: Mock, session) -> None:
     mypdl.set_data_fetch(DETAIL_CONSUM)
     await mypdl.async_update()
     resultat = mypdl.stats["consumption"]
-    assert mypdl.tempo_day == "blue"
+    assert mypdl.tempo == "blue"
 
 
 @freeze_time("2023-3-3")

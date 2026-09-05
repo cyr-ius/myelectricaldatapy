@@ -41,7 +41,6 @@ from .types import (
     Prices,
     Subscription,
     TempoDays,
-    TempoLabels,
     TempoMapping,
     UsagePoint,
 )
@@ -61,7 +60,7 @@ class EnedisByPDL:
     This class allows you to obtain information specific to a connection point.
 
     The "set_collect" function allows you to specify the collection parameters from Enedis
-    The "async_update_collects" function allows you to perform the calculations
+    The "_async_fetch_data" function allows you to perform the calculations
     The result is displayed in the property: stats
     y"""
 
@@ -88,6 +87,7 @@ class EnedisByPDL:
         self._connected: bool = False
         self._ecowatt_subs: bool = False
         self._maxpower_subs: bool = False
+        self._convert_kwh: bool = True
         self._params: dict[Mode, dict[str, Any]] = {}
         self.subscription: Subscription = subscription
         self.access: AccessResponse | None = None
@@ -101,7 +101,7 @@ class EnedisByPDL:
         self._update_lock = asyncio.Lock()
         self.last_refresh: date | None = None
         self.max_power: DataCollect | None = None
-        self.tempo: TempoMapping | None = None
+        self.tempo_historics: TempoMapping | None = None
         self.tempo_days: TempoDays | None = None
         self.tempo_prices: Prices | None = None
 
@@ -130,7 +130,7 @@ class EnedisByPDL:
 
     @property
     def has_standard_subscription(self) -> bool:
-        """Offpeak hours subscription status."""
+        """Standard subscription status."""
         return self.subscription == Subscription.STANDARD
 
     @property
@@ -150,10 +150,24 @@ class EnedisByPDL:
         return self.ecowatt.get(str_date) if self.ecowatt is not None else None
 
     @property
-    def tempo_day(self) -> TempoLabels | None:
+    def tempo(self) -> str | None:
         """Tempo day."""
         str_date = local_now().strftime("%Y-%m-%d")
-        return self.tempo.get(str_date) if self.tempo is not None else None
+        return (
+            self.tempo_historics.get(str_date)
+            if self.tempo_historics is not None
+            else None
+        )
+
+    @property
+    def tempo_next(self) -> str | None:
+        """Tempo next days."""
+        str_date = (local_now() + timedelta(days=1)).strftime("%Y-%m-%d")
+        return (
+            self.tempo_historics.get(str_date)
+            if self.tempo_historics is not None
+            else None
+        )
 
     @property
     def prod_prices(self) -> Prices | None:
@@ -173,7 +187,7 @@ class EnedisByPDL:
             data = params.get("data", [])
             analytics = EnedisAnalytics(data, timezone=self._timezone)
             resultat = analytics.get_data_analytics(
-                convertKwh=True,
+                convertKwh=self._convert_kwh,
                 intervals=params.get(ATTR_INTERVALS, []),
                 groupby=True,
                 summary=True,
@@ -181,7 +195,7 @@ class EnedisByPDL:
                 cum_value=_dump(params.get(ATTR_CUM_VALUE)),
                 cum_price=_dump(params.get(ATTR_CUM_PRICE)),
                 start_date=params.get(ATTR_START),
-                tempo=self.tempo,
+                tempo=self.tempo_historics,
             )
             stats.update({mode: resultat})
         return stats
@@ -202,6 +216,7 @@ class EnedisByPDL:
         self.ecowatt = None
         self.max_power = None
         self.has_collected = False
+        self.tempo_historics = None
         self.tempo_days = None
         self.tempo_prices = None
 
@@ -249,15 +264,20 @@ class EnedisByPDL:
                     self.pdl, start, end
                 )
 
-            if self.has_parameters and self.has_collected is False:
-                await self.async_update_collects()
-                self.last_refresh = local_now()
+            if self.tempo_historics is None and self.has_tempo_subscription:
+                start = local_now() - timedelta(days=1095)
+                end = local_now() + timedelta(days=1)
+                self.tempo_historics = await self._api.async_get_tempo(start, end)
 
             if self.tempo_prices is None and self.has_tempo_subscription:
                 self.tempo_prices = await self._api.async_get_tempo_prices()
 
             if self.tempo_days is None and self.has_tempo_subscription:
                 self.tempo_days = await self._api.async_get_tempo_days()
+
+            if self.has_parameters and self.has_collected is False:
+                await self._async_fetch_data()
+                self.last_refresh = local_now()
 
         except EnedisException as error:
             raise error from error
@@ -314,6 +334,7 @@ class EnedisByPDL:
         prices: Prices | Mapping[str, Any] | None = None,
         cum_value: Cum | Mapping[str, Any] | None = None,
         cum_price: Cum | Mapping[str, Any] | None = None,
+        convert_kwh: bool = True,
     ) -> None:
         """Set parameters for data fetching.
 
@@ -322,8 +343,9 @@ class EnedisByPDL:
         end: date of end to collect data
         intervals: offpeak hours range - ex: [("01:00","05:00"),("12:00","14:00")]
         prices: price for standard interval and offpeak interval
-        cum_sum: price of start
-        cum_price:
+        cum_sum: Cumulative kwh value of start
+        cum_price: Cumulative price of start
+        convert_kwh: whether to convert kWh to Wh
         """
         funcs: dict[str, Callable[..., Any]] = {
             DAILY_PROD: self._api.async_get_daily_production,
@@ -349,9 +371,10 @@ class EnedisByPDL:
         if cum_price:
             self._set_cumsum(mode, ATTR_PRICE, cum_price)
 
+        self._convert_kwh = convert_kwh
         self.has_parameters = True
 
-    async def async_update_collects(self) -> None:
+    async def _async_fetch_data(self) -> None:
         """Fetch data.
 
         It is necessary to value the initial data via the method: set_data_fetch.
@@ -379,9 +402,6 @@ class EnedisByPDL:
                     ]
                 }
             )
-
-            if mode == ATTR_CONSUM and self.has_tempo_subscription:
-                self.tempo = await self._api.async_get_tempo(start, end)
 
         self.has_collected = True
 

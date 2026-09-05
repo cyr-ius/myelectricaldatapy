@@ -109,7 +109,7 @@ class Prices(BaseModel):
 
 
 class Cum(_InputModel):
-    """Cumulative starting values for ``standard`` and ``offpeak`` intervals."""
+    """Cumulative starting kwh or wh values for ``standard`` and ``offpeak`` intervals."""
 
     standard: float
     offpeak: float | None = None
