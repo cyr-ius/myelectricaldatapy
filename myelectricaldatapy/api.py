@@ -11,7 +11,7 @@ from pydantic import BaseModel, ValidationError
 
 from .auth import EnedisAuth
 from .const import DAILY_CONSUM, DAILY_PROD, DETAIL_CONSUM, DETAIL_PROD
-from .exceptions import EnedisException, PayloadError
+from .exceptions import EnedisException, LimitReached, PayloadError
 from .types import (
     AccessResponse,
     Contract,
@@ -275,6 +275,11 @@ class Enedis:
                         DataCollect,
                         await self.async_fetch_datas(service, pdl, start, end),
                     )
+            except LimitReached:
+                # Quota/throttling errors apply to every remaining chunk too,
+                # so let the caller see them (e.g. to back off until
+                # ThrottlingError.next_access_time) instead of swallowing them.
+                raise
             except EnedisException as error:
                 raise_error = True
                 logger.error(error)

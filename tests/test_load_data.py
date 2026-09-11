@@ -16,6 +16,7 @@ from myelectricaldatapy import (
     EnedisException,
     LimitReached,
     Subscription,
+    ThrottlingError,
 )
 from myelectricaldatapy.tz import LOCAL_TIMEZONE
 
@@ -249,3 +250,38 @@ async def test_exception(
             pass
         assert api.last_access is not None
         assert api.access.valid is True
+
+
+async def test_details_throttling_propagates(
+    mock_access,
+    session,
+) -> None:
+    """A ThrottlingError raised while fetching a details chunk must reach the caller.
+
+    Regression test: ``Enedis._async_get_details`` used to catch every
+    ``EnedisException`` per 7-day chunk and only log it, so callers (and
+    their ``next_access_time`` back-off logic) never saw the throttling.
+    Deliberately bypasses the ``mock_enedis`` fixture, which stubs
+    ``async_get_details_consumption`` wholesale and would skip the internal
+    per-chunk loop this test targets.
+    """
+    throttling = ThrottlingError(
+        "Throttled", next_access_time="2026-Sep-05 16:00:00+0000 UTC"
+    )
+    with (
+        patch.object(
+            myelectricaldatapy.Enedis,
+            "async_valid_access",
+            return_value=mock_access,
+        ),
+        patch.object(
+            myelectricaldatapy.Enedis,
+            "async_fetch_datas",
+            side_effect=throttling,
+        ),
+    ):
+        api = EnedisByPDL(pdl=PDL, token=TOKEN, session=session)
+        api.set_data_fetch(DETAIL_CONSUM)
+        with pytest.raises(ThrottlingError) as exc_info:
+            await api.async_update()
+        assert exc_info.value.next_access_time == "2026-Sep-05 16:00:00+0000 UTC"
