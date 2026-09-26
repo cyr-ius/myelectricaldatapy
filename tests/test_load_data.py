@@ -18,6 +18,7 @@ from myelectricaldatapy import (
     Subscription,
     ThrottlingError,
 )
+from myelectricaldatapy.const import ATTR_CONSUM
 from myelectricaldatapy.tz import LOCAL_TIMEZONE
 
 from .consts import PDL, TOKEN
@@ -285,3 +286,66 @@ async def test_details_throttling_propagates(
         with pytest.raises(ThrottlingError) as exc_info:
             await api.async_update()
         assert exc_info.value.next_access_time == "2026-Sep-05 16:00:00+0000 UTC"
+
+
+async def test_details_partial_progress_kept_on_throttle(
+    mock_access,
+    session,
+) -> None:
+    """Chunks fetched before a mid-range throttle must not be discarded.
+
+    Regression test: once ``_async_get_details`` correctly re-raises on a
+    throttled chunk (see ``test_details_throttling_propagates``), it still
+    discarded whatever earlier 7-day chunks it had already collected in the
+    same call, forcing the next cycle to re-request the whole range -- and
+    hit the same quota wall again -- instead of making forward progress.
+    """
+    first_chunk = {
+        "meter_reading": {
+            "interval_reading": [
+                {"value": "1000", "date": "2023-01-01 00:30:00"},
+            ]
+        }
+    }
+    throttling = ThrottlingError(
+        "Throttled", next_access_time="2026-Sep-05 16:00:00+0000 UTC"
+    )
+
+    with (
+        patch.object(
+            myelectricaldatapy.Enedis,
+            "async_valid_access",
+            return_value=mock_access,
+        ),
+        # Contract/address lookups also go through `async_fetch_datas`; stub
+        # them directly so they don't consume the chunk side_effect below.
+        patch.object(
+            myelectricaldatapy.Enedis, "async_get_contract", return_value=None
+        ),
+        patch.object(myelectricaldatapy.Enedis, "async_get_address", return_value=None),
+        patch.object(
+            myelectricaldatapy.Enedis,
+            "async_fetch_datas",
+            side_effect=[first_chunk, throttling],
+        ),
+    ):
+        api = EnedisByPDL(pdl=PDL, token=TOKEN, session=session)
+        # 14 days split into 7-day chunks: the first succeeds, the second
+        # (and last) throttles.
+        api.set_data_fetch(
+            DETAIL_CONSUM,
+            start=dt.strptime("2023-01-01", "%Y-%m-%d").replace(tzinfo=LOCAL_TIMEZONE),
+            end=dt.strptime("2023-01-15", "%Y-%m-%d").replace(tzinfo=LOCAL_TIMEZONE),
+        )
+        with pytest.raises(ThrottlingError) as exc_info:
+            await api.async_update()
+
+    # The exception itself carries what was already collected...
+    partial = exc_info.value.partial_data
+    assert partial is not None
+    assert len(partial.meter_reading.interval_reading) == 1
+
+    # ...and it was persisted onto the fetch params, so `api.stats` (read by
+    # callers unconditionally, even after this exception) reflects it
+    # instead of coming back empty.
+    assert api._params[ATTR_CONSUM]["data"]

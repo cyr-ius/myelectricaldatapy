@@ -386,7 +386,26 @@ class EnedisByPDL:
             end = attr[ATTR_END]
             fn = attr[ATTR_FN]
 
-            dataset: DataCollect | None = await fn(self.pdl, start, end)
+            try:
+                dataset: DataCollect | None = await fn(self.pdl, start, end)
+            except LimitReached as error:
+                # A paginated (detail) fetch may have already collected some
+                # chunks before hitting the quota/throttle wall. Persist that
+                # partial progress -- same as a normal successful fetch --
+                # instead of losing it and re-requesting the whole range
+                # (and the same wall) on the next cycle.
+                partial = error.partial_data
+                readings = partial.meter_reading.interval_reading if partial else []
+                if readings:
+                    self._params[mode].update(
+                        {
+                            "data": [
+                                reading.model_dump(exclude_none=True)
+                                for reading in readings
+                            ]
+                        }
+                    )
+                raise
 
             if dataset is None:
                 raise EnedisException("Data collection is empty")

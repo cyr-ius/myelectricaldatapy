@@ -8,7 +8,14 @@ class EnedisException(Exception):
 
 
 class LimitReached(EnedisException):
-    """Limit reached exception."""
+    """Limit reached exception.
+
+    ``partial_data`` optionally carries whatever a paginated fetch (e.g.
+    ``Enedis._async_get_details``) already collected before hitting the
+    limit, so callers can persist that progress instead of discarding it.
+    """
+
+    partial_data: Any = None
 
 
 class ThrottlingError(LimitReached):

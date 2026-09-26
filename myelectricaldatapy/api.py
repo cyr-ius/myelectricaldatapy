@@ -275,10 +275,15 @@ class Enedis:
                         DataCollect,
                         await self.async_fetch_datas(service, pdl, start, end),
                     )
-            except LimitReached:
+            except LimitReached as error:
                 # Quota/throttling errors apply to every remaining chunk too,
                 # so let the caller see them (e.g. to back off until
                 # ThrottlingError.next_access_time) instead of swallowing them.
+                # Whatever chunks already succeeded this call are attached to
+                # the exception so the caller can still persist that partial
+                # progress instead of discarding it and re-requesting the
+                # same full range (and hitting the same quota wall) next time.
+                error.partial_data = data
                 raise
             except EnedisException as error:
                 raise_error = True
