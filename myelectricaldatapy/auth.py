@@ -22,6 +22,23 @@ logger = logging.getLogger(__name__)
 URL = "https://myelectricaldata.fr"
 
 
+def _throttling_error(msg: Any) -> ThrottlingError | None:
+    """Return a ``ThrottlingError`` if ``msg`` carries the APIM throttle signature.
+
+    The gateway most commonly signals throttling with an HTTP 200 status and
+    this body (see below), but has also been observed returning the very
+    same body under a non-200 status. Both must be recognized the same way,
+    so this check is shared by both response branches instead of living only
+    in the success path.
+    """
+    if isinstance(msg, Mapping) and (
+        msg.get("code") == "900804" or msg.get("message") == "Message throttled out"
+    ):
+        detail = msg.get("description") or msg.get("message") or msg
+        return ThrottlingError(detail, next_access_time=msg.get("nextAccessTime"))
+    return None
+
+
 class EnedisAuth:
     """Class for Enedis Auth API."""
 
@@ -57,6 +74,8 @@ class EnedisAuth:
                     msg = json.loads(message)
                 except json.JSONDecodeError:
                     raise EnedisException({"message": message}) from error
+                if (throttled := _throttling_error(msg)) is not None:
+                    raise throttled from error
                 detail = msg.get("detail", msg) if isinstance(msg, Mapping) else msg
                 if error.status == 409:
                     raise LimitReached(detail) from error
@@ -77,14 +96,10 @@ class EnedisAuth:
                 "Malformed JSON response from MyElectricalData."
             ) from error
 
-        # The gateway signals throttling with an HTTP 200 status and a body
-        # carrying the APIM error code 900804, so it never reaches
-        # ``raise_for_status``. Surface it as a dedicated exception.
-        if isinstance(result, Mapping) and (
-            result.get("code") == "900804"
-            or result.get("message") == "Message throttled out"
-        ):
-            detail = result.get("description") or result.get("message") or result
-            raise ThrottlingError(detail, next_access_time=result.get("nextAccessTime"))
+        # The gateway most commonly signals throttling with an HTTP 200
+        # status and a body carrying the APIM error code 900804, so it never
+        # reaches ``raise_for_status``. Surface it as a dedicated exception.
+        if (throttled := _throttling_error(result)) is not None:
+            raise throttled
 
         return result
