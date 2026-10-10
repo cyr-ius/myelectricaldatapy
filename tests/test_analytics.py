@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from datetime import datetime as dt
+from datetime import UTC, datetime as dt, timedelta
+from itertools import pairwise
 from unittest.mock import Mock, patch
+from zoneinfo import ZoneInfo
 
 from freezegun import freeze_time
 import pytest
@@ -459,3 +461,89 @@ def test_offpeak_boundaries_snap_to_reading_granularity() -> None:
     assert notes_by_time["01:00:00"] == "offpeak"
     assert notes_by_time["05:30:00"] == "offpeak"
     assert notes_by_time["06:00:00"] == "standard"
+
+
+# --- Daylight saving time ----------------------------------------------------
+#
+# Enedis load curve timestamps are local wall-clock interval ENDs. On the two
+# DST change days, shifting them back by interval_length in wall-clock time
+# yields times that do not exist (spring) or exist twice (autumn), and the
+# subsequent tz_localize() blew up the whole fetch with
+# "Failed to compute analytics from the provided dataset: 2026-03-29 02:30:00".
+
+PARIS = ZoneInfo("Europe/Paris")
+
+
+def _starts_utc(resultat: list[dict]) -> list[str]:
+    return [r["date"].astimezone(UTC).strftime("%Y-%m-%d %H:%M") for r in resultat]
+
+
+def test_dst_spring_forward_load_curve() -> None:
+    """Clocks jump 02:00 -> 03:00: the 01:30-02:00 interval ends at 03:00."""
+    data = [
+        {"date": "2026-03-29 01:30:00", "value": "1000", "interval_length": "PT30M"},
+        {"date": "2026-03-29 03:00:00", "value": "1000", "interval_length": "PT30M"},
+        {"date": "2026-03-29 03:30:00", "value": "1000", "interval_length": "PT30M"},
+    ]
+    analytics = EnedisAnalytics(data, timezone=PARIS)
+
+    resultat = analytics.get_data_analytics(intervals=[("01:30:00", "08:00:00")])
+
+    assert _starts_utc(resultat) == [
+        "2026-03-29 00:00",  # 01:00 CET
+        "2026-03-29 00:30",  # 01:30 CET
+        "2026-03-29 01:00",  # 03:00 CEST
+    ]
+    assert [r["date"].strftime("%H:%M") for r in resultat] == [
+        "01:00",
+        "01:30",
+        "03:00",
+    ]
+    assert [r["notes"] for r in resultat] == ["standard", "offpeak", "offpeak"]
+    assert "date_utc" not in resultat[0]
+
+
+def test_dst_fall_back_load_curve() -> None:
+    """Clocks go back 03:00 -> 02:00: wall-clock 02:00-03:00 happens twice."""
+    data = [
+        {"date": "2025-10-26 02:00:00", "value": "1000", "interval_length": "PT30M"},
+        {"date": "2025-10-26 02:30:00", "value": "1000", "interval_length": "PT30M"},
+        {"date": "2025-10-26 02:00:00", "value": "1000", "interval_length": "PT30M"},
+        {"date": "2025-10-26 02:30:00", "value": "1000", "interval_length": "PT30M"},
+        {"date": "2025-10-26 03:00:00", "value": "1000", "interval_length": "PT30M"},
+    ]
+    analytics = EnedisAnalytics(data, timezone=PARIS)
+
+    resultat = analytics.get_data_analytics()
+
+    assert _starts_utc(resultat) == [
+        "2025-10-25 23:30",  # 01:30 CEST
+        "2025-10-26 00:00",  # 02:00 CEST
+        "2025-10-26 00:30",  # 02:30 CEST
+        "2025-10-26 01:00",  # 02:00 CET
+        "2025-10-26 01:30",  # 02:30 CET
+    ]
+
+
+def test_dst_full_days_keep_every_reading() -> None:
+    """A whole DST day is 46 (spring) / 50 (autumn) half-hours, none lost."""
+    for day, count in (("2026-03-29", 46), ("2025-10-26", 50)):
+        start = dt.fromisoformat(f"{day} 00:00:00").replace(tzinfo=PARIS)
+        data = []
+        for i in range(1, count + 1):
+            end = (start.astimezone(UTC) + timedelta(minutes=30 * i)).astimezone(PARIS)
+            data.append(
+                {
+                    "date": end.strftime("%Y-%m-%d %H:%M:%S"),
+                    "value": "1000",
+                    "interval_length": "PT30M",
+                }
+            )
+        analytics = EnedisAnalytics(data, timezone=PARIS)
+
+        resultat = analytics.get_data_analytics(convertKwh=True)
+
+        starts = [r["date"].astimezone(UTC) for r in resultat]
+        assert len(starts) == count
+        assert len(set(starts)) == count
+        assert all(b - a == timedelta(minutes=30) for a, b in pairwise(starts))

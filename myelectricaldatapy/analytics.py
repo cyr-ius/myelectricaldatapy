@@ -1,6 +1,6 @@
 """Class for analytics."""
 
-from datetime import datetime as dt, timedelta, tzinfo as _tzinfo
+from datetime import UTC, datetime as dt, timedelta, tzinfo as _tzinfo
 import logging
 import re
 from typing import Any
@@ -132,7 +132,17 @@ class EnedisAnalytics:
         except ValueError:
             self.df["date"] = pd.to_datetime(self.df["date"], format="%Y-%m-%d")
 
-        self.df["date"] = self.df["date"].dt.tz_localize(self.local_timezone)
+        if "date_utc" in self.df and self.df["date_utc"].notna().all():
+            # Shifted load curve readings carry their exact instant: use it
+            # instead of re-localizing wall-clock strings, which is ambiguous
+            # or impossible on DST change days.
+            self.df["date"] = pd.to_datetime(
+                self.df["date_utc"], utc=True, format="ISO8601"
+            ).dt.tz_convert(self.local_timezone)
+        else:
+            self.df["date"] = self.df["date"].dt.tz_localize(self.local_timezone)
+        if "date_utc" in self.df:
+            self.df = self.df.drop(columns="date_utc")
 
         if "interval_length" in self.df:
             step_hour = True
@@ -284,6 +294,7 @@ class EnedisAnalytics:
         """
         shifted_count = 0
         shifted_readings: list[dict[str, Any]] = []
+        previous_end: dt | None = None
 
         for reading in readings:
             interval_length_iso = reading.get("interval_length")
@@ -302,12 +313,16 @@ class EnedisAnalytics:
                 if "T" in original_date:
                     dt_orig_date = dt.fromisoformat(original_date)
                 else:
-                    dt_orig_date = dt.strptime(
-                        original_date, "%Y-%m-%d %H:%M:%S"
-                    ).replace(tzinfo=self.local_timezone)
+                    dt_orig_date = dt.strptime(original_date, "%Y-%m-%d %H:%M:%S")
+                if dt_orig_date.tzinfo is None:
+                    dt_orig_date = self._localize_wall_clock(dt_orig_date, previous_end)
+                previous_end = dt_orig_date.astimezone(UTC)
 
-                # Shift backwards by interval_length
-                shifted_dt = dt_orig_date - timedelta(minutes=interval_minutes)
+                # Shift backwards by interval_length in absolute time: wall-clock
+                # arithmetic is wrong across a DST change (e.g. 03:00 - 30min
+                # would give 02:30, which does not exist on the spring day).
+                start_utc = previous_end - timedelta(minutes=interval_minutes)
+                shifted_dt = start_utc.astimezone(self.local_timezone)
 
                 # Format back to original format
                 new_date = (
@@ -316,7 +331,9 @@ class EnedisAnalytics:
                     else shifted_dt.strftime("%Y-%m-%d %H:%M:%S")
                 )
 
-                shifted_readings.append({**reading, "date": new_date})
+                shifted_readings.append(
+                    {**reading, "date": new_date, "date_utc": start_utc.isoformat()}
+                )
                 shifted_count += 1
 
             except ValueError as e:
@@ -331,3 +348,22 @@ class EnedisAnalytics:
             )
 
         return shifted_readings
+
+    def _localize_wall_clock(self, naive: dt, previous_end: dt | None) -> dt:
+        """Attach the local timezone to a naive wall-clock reading timestamp.
+
+        When clocks go back, a wall-clock time occurs twice. Readings come in
+        chronological order, so pick the earliest occurrence that is still
+        after the previous reading (fold=0 the first time, fold=1 the second).
+        """
+        candidates = [
+            naive.replace(tzinfo=self.local_timezone, fold=fold) for fold in (0, 1)
+        ]
+        if previous_end is not None:
+            for candidate in candidates:
+                if candidate.astimezone(UTC) > previous_end:
+                    return candidate
+            logger.warning(
+                "[ENEDIS] Reading %s is not after the previous one", naive.isoformat()
+            )
+        return candidates[0]
