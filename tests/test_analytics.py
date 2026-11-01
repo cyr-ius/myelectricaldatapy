@@ -5,6 +5,7 @@ from __future__ import annotations
 from copy import deepcopy
 from datetime import datetime as dt
 from unittest.mock import Mock, patch
+from zoneinfo import ZoneInfo
 
 from freezegun import freeze_time
 import pytest
@@ -385,6 +386,58 @@ def test_shift_timestamps_does_not_mutate_input() -> None:
     analytics._shift_timestamps_to_interval_start(readings)
 
     assert readings == original
+
+
+def test_dst_fall_back_repeated_hour() -> None:
+    """On the DST fall-back day Enedis repeats the 02:00-03:00 local hour;
+    both passes must be shifted and localized without AmbiguousTimeError.
+    """
+    readings = [
+        {"date": f"2026-10-25 {hour}:00", "value": "1000", "interval_length": "PT30M"}
+        for hour in ("01:30", "02:00", "02:30", "02:00", "02:30", "03:00")
+    ]
+    analytics = EnedisAnalytics(readings, timezone=ZoneInfo("Europe/Paris"))
+
+    result = analytics.get_data_analytics()
+
+    assert [str(row["date"]) for row in result] == [
+        "2026-10-25 01:00:00+02:00",
+        "2026-10-25 01:30:00+02:00",
+        "2026-10-25 02:00:00+02:00",
+        "2026-10-25 02:30:00+02:00",
+        "2026-10-25 02:00:00+01:00",
+        "2026-10-25 02:30:00+01:00",
+    ]
+
+
+@pytest.mark.parametrize(
+    "hours",
+    [
+        # Interval ending at 02:00 CET written as its CEST equivalent
+        ("01:00", "01:30", "03:00", "03:30", "04:00"),
+        # Interval ending at 02:00 CET written as the nonexistent 02:00
+        ("01:00", "01:30", "02:00", "03:30", "04:00"),
+    ],
+)
+def test_dst_spring_forward_skipped_hour(hours: tuple[str, ...]) -> None:
+    """On the DST spring-forward day the 02:00-03:00 local hour does not exist;
+    shifted starts must stay 30min apart without NonExistentTimeError.
+    """
+    readings = [
+        {"date": f"2026-03-29 {hour}:00", "value": "1000", "interval_length": "PT30M"}
+        for hour in hours
+    ]
+    analytics = EnedisAnalytics(readings, timezone=ZoneInfo("Europe/Paris"))
+
+    result = analytics.get_data_analytics()
+
+    assert [str(row["date"]) for row in result] == [
+        "2026-03-29 00:30:00+01:00",
+        "2026-03-29 01:00:00+01:00",
+        "2026-03-29 01:30:00+01:00",
+        "2026-03-29 03:00:00+02:00",
+        "2026-03-29 03:30:00+02:00",
+    ]
 
 
 @pytest.mark.parametrize(

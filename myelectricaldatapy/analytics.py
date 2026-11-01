@@ -1,6 +1,6 @@
 """Class for analytics."""
 
-from datetime import datetime as dt, timedelta, tzinfo as _tzinfo
+from datetime import UTC, datetime as dt, timedelta, tzinfo as _tzinfo
 import logging
 import re
 from typing import Any
@@ -132,7 +132,12 @@ class EnedisAnalytics:
         except ValueError:
             self.df["date"] = pd.to_datetime(self.df["date"], format="%Y-%m-%d")
 
-        self.df["date"] = self.df["date"].dt.tz_localize(self.local_timezone)
+        # On the DST fall-back day the same local hour appears twice: the first
+        # occurrence is still summer time (DST), the repeated one is winter time.
+        is_dst = (self.df.groupby("date").cumcount() == 0).to_numpy()
+        self.df["date"] = self.df["date"].dt.tz_localize(
+            self.local_timezone, ambiguous=is_dst, nonexistent="shift_forward"
+        )
 
         if "interval_length" in self.df:
             step_hour = True
@@ -284,6 +289,7 @@ class EnedisAnalytics:
         """
         shifted_count = 0
         shifted_readings: list[dict[str, Any]] = []
+        seen_dates: set[dt] = set()
 
         for reading in readings:
             interval_length_iso = reading.get("interval_length")
@@ -306,8 +312,22 @@ class EnedisAnalytics:
                         original_date, "%Y-%m-%d %H:%M:%S"
                     ).replace(tzinfo=self.local_timezone)
 
-                # Shift backwards by interval_length
-                shifted_dt = dt_orig_date - timedelta(minutes=interval_minutes)
+                # On the DST fall-back day the same wall-clock time appears
+                # twice: the repeated one is the second (winter time) pass.
+                if dt_orig_date.tzinfo is not None:
+                    if dt_orig_date in seen_dates:
+                        dt_orig_date = dt_orig_date.replace(fold=1)
+                    seen_dates.add(dt_orig_date)
+
+                # Shift backwards by interval_length, in absolute time so the
+                # DST transition is accounted for
+                delta = timedelta(minutes=interval_minutes)
+                if dt_orig_date.tzinfo is not None:
+                    shifted_dt = (dt_orig_date.astimezone(UTC) - delta).astimezone(
+                        dt_orig_date.tzinfo
+                    )
+                else:
+                    shifted_dt = dt_orig_date - delta
 
                 # Format back to original format
                 new_date = (
