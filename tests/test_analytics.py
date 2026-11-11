@@ -529,7 +529,9 @@ def test_start_date_keeps_daily_reading_on_start_day() -> None:
     ]
     analytics = EnedisAnalytics(data, timezone=LOCAL_TIMEZONE)
 
-    resultat = analytics.get_data_analytics(start_date=dt(2023, 3, 7))
+    resultat = analytics.get_data_analytics(
+        start_date=dt(2023, 3, 7, tzinfo=LOCAL_TIMEZONE)
+    )
 
     assert [r["date"].date().isoformat() for r in resultat] == ["2023-03-07"]
     assert resultat[0]["value"] == 2000
@@ -548,7 +550,9 @@ def test_start_date_keeps_first_detail_interval() -> None:
     ]
     analytics = EnedisAnalytics(data, timezone=LOCAL_TIMEZONE)
 
-    resultat = analytics.get_data_analytics(start_date=dt(2023, 3, 7), groupby=True)
+    resultat = analytics.get_data_analytics(
+        start_date=dt(2023, 3, 7, tzinfo=LOCAL_TIMEZONE), groupby=True
+    )
 
     assert len(resultat) == 1
     assert resultat[0]["value"] == 2000
