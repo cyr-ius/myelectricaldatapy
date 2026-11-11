@@ -512,3 +512,43 @@ def test_offpeak_boundaries_snap_to_reading_granularity() -> None:
     assert notes_by_time["01:00:00"] == "offpeak"
     assert notes_by_time["05:30:00"] == "offpeak"
     assert notes_by_time["06:00:00"] == "standard"
+
+
+# --- start_date is inclusive (hass-myelectricaldata#156) ---------------------
+
+
+def test_start_date_keeps_daily_reading_on_start_day() -> None:
+    """The daily reading dated on start_date is the first one requested.
+
+    Callers resume from the day after their last import: dropping that day's
+    reading lost it for good as soon as a later day was imported with it.
+    """
+    data = [
+        {"date": "2023-03-06", "value": "1000"},
+        {"date": "2023-03-07", "value": "2000"},
+    ]
+    analytics = EnedisAnalytics(data, timezone=LOCAL_TIMEZONE)
+
+    resultat = analytics.get_data_analytics(start_date=dt(2023, 3, 7))
+
+    assert [r["date"].date().isoformat() for r in resultat] == ["2023-03-07"]
+    assert resultat[0]["value"] == 2000
+
+
+def test_start_date_keeps_first_detail_interval() -> None:
+    """The interval starting on start_date belongs to the first hour asked for.
+
+    Dropping it imported that hour with only its second half-hour.
+    """
+    data = [
+        # [00:00, 00:30) once shifted to its interval start.
+        {"date": "2023-03-07 00:30:00", "value": "1000", "interval_length": "PT30M"},
+        # [00:30, 01:00)
+        {"date": "2023-03-07 01:00:00", "value": "3000", "interval_length": "PT30M"},
+    ]
+    analytics = EnedisAnalytics(data, timezone=LOCAL_TIMEZONE)
+
+    resultat = analytics.get_data_analytics(start_date=dt(2023, 3, 7), groupby=True)
+
+    assert len(resultat) == 1
+    assert resultat[0]["value"] == 2000
