@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime as dt
+import json
 from unittest.mock import Mock, patch
 
 from freezegun import freeze_time
@@ -10,6 +11,8 @@ import pytest
 
 import myelectricaldatapy
 from myelectricaldatapy import (
+    DAILY_CONSUM,
+    DAILY_PROD,
     DETAIL_CONSUM,
     Enedis,
     EnedisByPDL,
@@ -19,8 +22,10 @@ from myelectricaldatapy import (
     ThrottlingError,
 )
 from myelectricaldatapy.const import ATTR_CONSUM
+from myelectricaldatapy.types import DataCollect
 from myelectricaldatapy.tz import LOCAL_TIMEZONE
 
+from . import load_fixture
 from .consts import PDL, TOKEN
 
 
@@ -349,3 +354,91 @@ async def test_details_partial_progress_kept_on_throttle(
     # callers unconditionally, even after this exception) reflects it
     # instead of coming back empty.
     assert api._params[ATTR_CONSUM]["data"]
+
+
+# --- refetch when the requested range moves (hass-myelectricaldata#155) -------
+
+DAILY = DataCollect.model_validate(json.loads(load_fixture("daily.json")))
+
+
+def _local_day(value: str) -> dt:
+    return dt.strptime(value, "%Y-%m-%d").replace(tzinfo=LOCAL_TIMEZONE)
+
+
+@freeze_time("2023-03-08 06:00:00")
+async def test_moved_start_is_fetched_again_the_same_day(
+    mock_enedis: Mock,  # pylint: disable=unused-argument
+    session,
+) -> None:
+    """A later start set after a successful collection must reach the API."""
+    with patch.object(
+        myelectricaldatapy.Enedis, "async_get_daily_consumption", return_value=DAILY
+    ) as fetch:
+        api = EnedisByPDL(pdl=PDL, token=TOKEN, session=session)
+        api.set_data_fetch(DAILY_CONSUM, start=_local_day("2023-03-05"))
+        await api.async_update()
+        assert fetch.call_count == 1
+
+        # Same range again: no call spent, collected data still exposed.
+        api.set_data_fetch(DAILY_CONSUM, start=_local_day("2023-03-05"))
+        await api.async_update()
+        assert fetch.call_count == 1
+        assert api.stats[ATTR_CONSUM]
+
+        # Resumed from a later day (part of the range imported meanwhile).
+        api.set_data_fetch(DAILY_CONSUM, start=_local_day("2023-03-07"))
+        await api.async_update()
+        assert fetch.call_count == 2
+        assert fetch.call_args.args[1] == _local_day("2023-03-07")
+
+
+@freeze_time("2023-03-08 06:00:00")
+async def test_moved_start_only_refetches_its_own_mode(
+    mock_enedis: Mock,  # pylint: disable=unused-argument
+    session,
+) -> None:
+    """Moving one mode's range must not spend a call on the other mode."""
+    with (
+        patch.object(
+            myelectricaldatapy.Enedis,
+            "async_get_daily_consumption",
+            return_value=DAILY,
+        ) as consumption,
+        patch.object(
+            myelectricaldatapy.Enedis,
+            "async_get_daily_production",
+            return_value=DAILY,
+        ) as production,
+    ):
+        api = EnedisByPDL(pdl=PDL, token=TOKEN, session=session)
+        api.set_data_fetch(DAILY_CONSUM, start=_local_day("2023-03-05"))
+        api.set_data_fetch(DAILY_PROD, start=_local_day("2023-03-05"))
+        await api.async_update()
+        assert (consumption.call_count, production.call_count) == (1, 1)
+
+        api.set_data_fetch(DAILY_CONSUM, start=_local_day("2023-03-07"))
+        await api.async_update()
+        assert (consumption.call_count, production.call_count) == (2, 1)
+
+
+async def test_collected_range_is_fetched_again_after_midnight(
+    mock_enedis: Mock,  # pylint: disable=unused-argument
+    session,
+) -> None:
+    """The daily cache reset still refetches an unchanged range."""
+    with (
+        freeze_time("2023-03-08 06:00:00") as frozen,
+        patch.object(
+            myelectricaldatapy.Enedis,
+            "async_get_daily_consumption",
+            return_value=DAILY,
+        ) as fetch,
+    ):
+        api = EnedisByPDL(pdl=PDL, token=TOKEN, session=session)
+        api.set_data_fetch(DAILY_CONSUM, start=_local_day("2023-03-05"))
+        await api.async_update()
+        assert fetch.call_count == 1
+
+        frozen.move_to("2023-03-09 06:00:00")
+        await api.async_update()
+        assert fetch.call_count == 2

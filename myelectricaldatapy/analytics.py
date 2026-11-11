@@ -146,7 +146,12 @@ class EnedisAnalytics:
             dt_start_date = pd.to_datetime(start_date, format="%Y-%m-%d %H:%M:%S")
             if dt_start_date.tzinfo is None:
                 dt_start_date = dt_start_date.tz_localize(self.local_timezone)
-            self.df = self.df[(self.df["date"] > dt_start_date)]
+            # start_date is inclusive, like the API range it was requested
+            # with: a daily reading is dated at 00:00 of its own day and a
+            # detail reading at the start of its interval, so the reading
+            # sitting exactly on start_date is the first one asked for and
+            # must be kept.
+            self.df = self.df[(self.df["date"] >= dt_start_date)]
 
         self.df.index = self.df["date"]
 

@@ -48,6 +48,9 @@ from .tz import as_local, local_now, set_local_timezone
 
 logger = logging.getLogger(__name__)
 
+# Per-mode flag in EnedisByPDL._params: the range was fetched successfully.
+_COLLECTED = "collected"
+
 
 def _dump(model: BaseModel | None) -> dict[str, Any]:
     """Return a plain mapping for a model, dropping unset/``None`` entries."""
@@ -216,6 +219,8 @@ class EnedisByPDL:
         self.ecowatt = None
         self.max_power = None
         self.has_collected = False
+        for params in self._params.values():
+            params.pop(_COLLECTED, None)
         self.tempo_historics = None
         self.tempo_days = None
         self.tempo_prices = None
@@ -360,7 +365,34 @@ class EnedisByPDL:
         func = funcs[service]
         dt_start = as_local(start) if start else local_now() - timedelta(days=days)
         dt_end = as_local(end) if end else local_now() + timedelta(days=1)
-        self._params[mode] = {ATTR_FN: func, ATTR_START: dt_start, ATTR_END: dt_end}
+
+        params: dict[str, Any] = {
+            ATTR_FN: func,
+            ATTR_START: dt_start,
+            ATTR_END: dt_end,
+        }
+        previous = self._params.get(mode, {})
+        # An unset start/end drifts with the clock: only its day matters (the
+        # API range is day-based). A given start is compared exactly, so a
+        # detail import resumed later the same day is fetched again.
+        if previous.get(_COLLECTED) and (
+            previous[ATTR_FN] == func
+            and (
+                previous[ATTR_START] == dt_start
+                if start
+                else previous[ATTR_START].date() == dt_start.date()
+            )
+            and previous[ATTR_END].date() == dt_end.date()
+        ):
+            # Same range as the one already fetched today: keep it so the
+            # next update doesn't spend an API call on it again.
+            params.update({_COLLECTED: True, "data": previous.get("data", [])})
+        else:
+            # New mode, or a caller resuming from another start (e.g. after
+            # importing part of a catch-up): fetch it on the next update
+            # instead of waiting for the daily cache reset at midnight.
+            self.has_collected = False
+        self._params[mode] = params
 
         if intervals:
             self._set_intervals(mode, intervals)
@@ -382,6 +414,10 @@ class EnedisByPDL:
         """
 
         for mode, attr in self._params.items():
+            if attr.get(_COLLECTED):
+                # Already fetched since its range was last set or the daily
+                # cache reset: don't spend another call of the daily quota.
+                continue
             start = attr[ATTR_START]
             end = attr[ATTR_END]
             fn = attr[ATTR_FN]
@@ -418,7 +454,8 @@ class EnedisByPDL:
                 {
                     "data": [
                         reading.model_dump(exclude_none=True) for reading in readings
-                    ]
+                    ],
+                    _COLLECTED: True,
                 }
             )
 
