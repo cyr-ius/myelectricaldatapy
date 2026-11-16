@@ -9,7 +9,7 @@ payloads coming from the API::
     from myelectricaldatapy import Prices, DataCollect
 """
 
-from datetime import datetime
+from datetime import date
 from enum import IntFlag
 from typing import Annotated, Any, Literal
 
@@ -258,10 +258,11 @@ class Subscription(IntFlag):
 def _check_iso_date(value: str) -> str:
     """Ensure a mapping key is a real, zero-padded ``YYYY-MM-DD`` calendar date."""
     try:
-        parsed = datetime.strptime(value, "%Y-%m-%d")  # noqa: DTZ007  # shape check only
+        parsed = date.fromisoformat(value)
     except ValueError as error:
         raise ValueError(f"expected a YYYY-MM-DD date, got {value!r}") from error
-    if parsed.strftime("%Y-%m-%d") != value:
+    # fromisoformat also accepts basic and week forms (20240101, 2024-W01-1)
+    if parsed.isoformat() != value:
         raise ValueError(f"expected a zero-padded YYYY-MM-DD date, got {value!r}")
     return value
 
